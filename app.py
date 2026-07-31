@@ -791,7 +791,7 @@ def load_hero_bg_b64() -> str:
 _bg_b64 = load_hero_bg_b64()
 if _bg_b64:
     _hero_bg_css = (
-        f"background-image: linear-gradient(180deg, rgba(6,34,46,0.35) 0%, rgba(6,34,46,0.62) 100%), "
+        f"background-image: linear-gradient(180deg, rgba(6,34,46,0.18) 0%, rgba(6,34,46,0.42) 100%), "
         f"url('data:image/jpeg;base64,{_bg_b64}'); "
         f"background-size: cover; background-position: center;"
     )
@@ -845,8 +845,8 @@ HERO_HTML = """
     font-weight: 600;
     font-size: clamp(1.8rem, 3.6vw, 2.7rem);
     line-height: 1.22;
-    color: var(--cream);
-    text-shadow: 0 2px 18px rgba(6,34,46,0.45);
+    color: var(--cream) !important;
+    text-shadow: 0 2px 18px rgba(6,34,46,0.55);
     margin: 0 auto 0.6rem auto;
     position: relative;
     z-index: 2;
@@ -854,9 +854,9 @@ HERO_HTML = """
 }
 .hero-sub {
     font-family: 'Public Sans', sans-serif;
-    font-size: 1.02rem;
-    color: rgba(253, 251, 247, 0.92);
-    text-shadow: 0 1px 12px rgba(6,34,46,0.5);
+    font-size: 1.05rem;
+    color: rgba(253, 251, 247, 0.95) !important;
+    text-shadow: 0 1px 12px rgba(6,34,46,0.55);
     max-width: 38rem;
     margin-left: auto;
     margin-right: auto;
@@ -1028,14 +1028,6 @@ with tab2:
             "`cf_knn_model.joblib`."
         )
     else:
-        st.info(
-            "⚠️ **Lưu ý về dữ liệu:** mỗi người dùng trong bộ dữ liệu này chỉ đánh giá **đúng 1 khách sạn** "
-            "(không có lịch sử đánh giá nhiều nơi). Vì vậy hai khách sạn bất kỳ hầu như không có người dùng "
-            "chung để so sánh, khiến độ tương đồng thực tế giữa các khách sạn thường bằng 0 — mô hình vẫn chạy "
-            "đúng kỹ thuật, nhưng kết quả gợi ý ở tab này mang tính minh hoạ thuật toán hơn là gợi ý chính xác. "
-            "Đây là hạn chế của dữ liệu (đã ghi nhận trong notebook), không phải lỗi ứng dụng."
-        )
-
         cf_hotel_ids = set(cf_art["hotel_index"][C_ID])
         cf_hotel_names = df_hotel.loc[df_hotel[C_ID].isin(cf_hotel_ids), C_NAME].tolist()
 
