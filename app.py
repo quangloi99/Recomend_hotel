@@ -847,7 +847,7 @@ HERO_HTML = """
     line-height: 1.22;
     color: var(--cream) !important;
     text-shadow: 0 2px 18px rgba(6,34,46,0.55);
-    margin: 0 auto 0.6rem auto;
+    margin: 0 auto 0.6rem auto !important;
     position: relative;
     z-index: 2;
     max-width: 42rem;
@@ -858,8 +858,8 @@ HERO_HTML = """
     color: rgba(253, 251, 247, 0.95) !important;
     text-shadow: 0 1px 12px rgba(6,34,46,0.55);
     max-width: 38rem;
-    margin-left: auto;
-    margin-right: auto;
+    margin-left: auto !important;
+    margin-right: auto !important;
     position: relative;
     z-index: 2;
 }
@@ -1020,12 +1020,6 @@ with tab1:
 
 # ------------------------------------------------------------------ TAB 2
 with tab2:
-    st.caption(
-        "Chọn một khách sạn bạn đang quan tâm, hệ thống sẽ gợi ý các khách sạn khác dựa trên "
-        "**hành vi đánh giá của người dùng** (mô hình Item-Based KNN) — khác với Yêu cầu 1 vốn "
-        "dựa trên nội dung mô tả."
-    )
-
     if cf_art.get("knn") is None or cf_art.get("hotel_index") is None:
         st.error(
             "Chưa có mô hình Collaborative filtering. Chạy `python build_hotel_artifacts.py` để tạo "
