@@ -995,7 +995,11 @@ tab1, tab2, tab3 = st.tabs([
 
 # ------------------------------------------------------------------ TAB 1
 with tab1:
-    st.caption("Mô tả điều bạn mong muốn để hệ thống tìm khách sạn phù hợp.")
+    st.markdown(
+        '<p style="text-align:center; color:#6b7280; font-size:0.875rem;">'
+        'Mô tả điều bạn mong muốn để hệ thống tìm khách sạn phù hợp.</p>',
+        unsafe_allow_html=True,
+    )
 
     if content_art["cosine_sim"] is None and content_art["vectorizer"] is None:
         st.error(
@@ -1054,8 +1058,6 @@ with tab2:
 
 # ------------------------------------------------------------------ TAB 3
 with tab3:
-    st.caption("Nhập tên khách sạn để xem báo cáo insight đầy đủ: tổng quan, điểm mạnh/yếu, "
-               "khách hàng, từ khoá nổi bật và so sánh với trung bình hệ thống.")
 
     if df_cmt.empty:
         st.warning(
