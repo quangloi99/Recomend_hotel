@@ -822,6 +822,7 @@ HERO_HTML = """
     padding: 3.2rem 2.2rem 3.6rem 2.2rem;
     __HERO_BG__
     overflow: hidden;
+    text-align: center;
 }
 .hero-eyebrow {
     display: inline-block;
@@ -846,7 +847,7 @@ HERO_HTML = """
     line-height: 1.22;
     color: var(--cream);
     text-shadow: 0 2px 18px rgba(6,34,46,0.45);
-    margin: 0 0 0.6rem 0;
+    margin: 0 auto 0.6rem auto;
     position: relative;
     z-index: 2;
     max-width: 42rem;
@@ -857,6 +858,8 @@ HERO_HTML = """
     color: rgba(253, 251, 247, 0.92);
     text-shadow: 0 1px 12px rgba(6,34,46,0.5);
     max-width: 38rem;
+    margin-left: auto;
+    margin-right: auto;
     position: relative;
     z-index: 2;
 }
@@ -896,9 +899,14 @@ HERO_HTML = """
 }
 
 /* Nut chinh: bo tron, mau xanh, can giua, khong keo full-width */
+div[data-testid="stElementContainer"]:has(div[data-testid="stFormSubmitButton"]),
+div[data-testid="stElementContainer"]:has(div[data-testid="stButton"]) {
+    width: 100% !important;
+}
 div[data-testid="stFormSubmitButton"], div[data-testid="stButton"] {
-    display: flex;
-    justify-content: center;
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
 }
 div[data-testid="stFormSubmitButton"] button[kind="primary"],
 div[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"],
@@ -947,10 +955,9 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 
 <div class="hero-wrap">
     <span class="hero-eyebrow">Nha Trang · Khánh Hoà</span>
-    <h1 class="hero-title">Tìm khách sạn tương tự, hiểu insight thật nhanh</h1>
+    <h1 class="hero-title">Nha Trang – điểm đến nghỉ dưỡng dành cho bạn</h1>
     <p class="hero-sub">
-        Gợi ý khách sạn dựa trên nội dung mô tả, và báo cáo insight tự động
-        cho chủ khách sạn — từ điểm mạnh/yếu đến từ khoá nổi bật trong đánh giá.
+        Lựa chọn khách sạn để có những trải nghiệm tuyệt vời tại đây.
     </p>
     <div class="hero-wave">
         <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -1044,7 +1051,7 @@ with tab2:
                         help="Chỉ hiển thị các khách sạn đã có ít nhất 1 đánh giá trong dữ liệu.",
                     )
                     cf_top_n = st.slider("Số khách sạn gợi ý", 3, 20, TOP_N_DEFAULT, key="cf_top_n")
-                    cf_submitted = st.form_submit_button("👥 Tìm khách sạn tương tự", type="primary")
+                    cf_submitted = st.form_submit_button("👥 Tìm kiếm", type="primary")
 
             if cf_submitted:
                 st.divider()
