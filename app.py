@@ -955,9 +955,9 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 
 <div class="hero-wrap">
     <span class="hero-eyebrow">Nha Trang · Khánh Hoà</span>
-    <h1 class="hero-title">Nha Trang – điểm đến nghỉ dưỡng dành cho bạn</h1>
+    <h1 class="hero-title">Hệ thống gợi ý tìm kiếm khách sạn ở Nha Trang</h1>
     <p class="hero-sub">
-        Lựa chọn khách sạn để có những trải nghiệm tuyệt vời tại đây.
+        Đồ án tốt nghiệp Data Science · Nhóm thực hiện: Kim Thanh – Quang Lợi
     </p>
     <div class="hero-wave">
         <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -988,9 +988,9 @@ hotel_photos = load_hotel_photos()
 system_avg = compute_system_avg(df_hotel)
 
 tab1, tab2, tab3 = st.tabs([
-    "🔍 Yêu cầu 1 — Gợi ý khách sạn tương tự",
-    "👥 Yêu cầu 2 — Collaborative filtering",
-    "📊 Yêu cầu 3 — Insight cho chủ khách sạn",
+    "🔍 1. Gợi ý theo nội dung",
+    "👥 2. Gợi ý theo lọc cộng tác",
+    "📊 3. Insight cho chủ khách sạn",
 ])
 
 # ------------------------------------------------------------------ TAB 1
