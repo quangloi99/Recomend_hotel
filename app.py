@@ -414,9 +414,8 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
         st.caption("Khách sạn này chưa có đánh giá nào.")
         return
 
-    show_n = st.slider("Số bình luận hiển thị", 3, min(30, len(reviews)),
-                        min(10, len(reviews)), key="detail_review_count")
-    reviews_sorted = reviews.sort_values(CM_SCORE, ascending=False, na_position="last").head(show_n)
+    st.caption(f"Hiển thị {min(10, len(reviews))} / {len(reviews)} đánh giá — điểm cao nhất trước.")
+    reviews_sorted = reviews.sort_values(CM_SCORE, ascending=False, na_position="last").head(10)
 
     for _, rv in reviews_sorted.iterrows():
         with st.container(border=True):
@@ -1012,14 +1011,20 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     display: block;
     border-radius: 12px;
 }
+.hotel-detail-thumb {
+    text-align: center;
+}
 .hotel-detail-thumb svg, .hotel-detail-thumb img {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 50% !important;
+    max-width: 50% !important;
     aspect-ratio: 1 / 1 !important;
     object-fit: cover !important;
-    display: block !important;
+    display: inline-block !important;
     border-radius: 12px !important;
     margin-bottom: 0.8rem !important;
+}
+@media (max-width: 700px) {
+    .hotel-detail-thumb svg, .hotel-detail-thumb img { width: 80% !important; max-width: 80% !important; }
 }
 .hotel-card-title {
     font-family: 'Fraunces', serif;
