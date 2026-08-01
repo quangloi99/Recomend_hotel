@@ -1086,6 +1086,17 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 .meta-map-link:hover {
     text-decoration: underline !important;
 }
+.overview-label {
+    font-weight: 700 !important;
+    color: var(--deepsea) !important;
+    font-size: 0.95rem;
+    margin-bottom: 0.15rem;
+}
+.overview-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: #262730;
+}
 .hotel-card-meta {
     font-size: 0.88rem !important;
     margin-bottom: 0.2rem !important;
@@ -1216,7 +1227,7 @@ with tab2:
             if "tab2_results" in st.session_state:
                 st.divider()
                 res_cf = st.session_state["tab2_results"]
-                st.subheader(f"Top {len(res_cf)} khách sạn tương tự")
+                st.subheader(f"Top {len(res_cf)} khách sạn tương tự (Item-Based KNN)")
                 render_results(res_cf, hotel_photos, state_key="tab2_viewing_id")
 
 # ------------------------------------------------------------------ TAB 3
@@ -1240,12 +1251,23 @@ with tab3:
             ov = rep["overview"]
             st.divider()
             st.subheader(f"1. Tổng quan — {ov['Hotel_Name']}")
+
+            def _overview_stat(icon, label, value):
+                st.markdown(
+                    f'<div class="overview-label">{icon} {label}</div>'
+                    f'<div class="overview-value">{value}</div>',
+                    unsafe_allow_html=True,
+                )
+
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Hạng sao", str(ov["Hotel_Rank"]))
-            c2.metric("Tổng điểm TB", f"{fmt_score(ov['Total_Score'])}/10")
-            c3.metric("Số lượt đánh giá", f"{int(ov['comments_count']):,}".replace(",", "."))
+            with c1:
+                _overview_stat("⭐", "Hạng sao", ov["Hotel_Rank"])
+            with c2:
+                _overview_stat("🎯", "Tổng điểm TB", f"{fmt_score(ov['Total_Score'])}/10")
+            with c3:
+                _overview_stat("💬", "Số lượt đánh giá", f"{int(ov['comments_count']):,}".replace(",", "."))
             with c4:
-                st.markdown("**📍 Địa chỉ**")
+                st.markdown('<div class="overview-label">📍 Địa chỉ</div>', unsafe_allow_html=True)
                 st.caption(ov["Hotel_Address"])
 
             st.subheader("2. Điểm mạnh & điểm yếu")
