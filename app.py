@@ -1433,16 +1433,32 @@ with tab3:
             if comparison is None or comparison.empty:
                 st.info("Không đủ dữ liệu để so sánh.")
             else:
-                fig, ax = plt.subplots(figsize=(6.3, 3.15))
+                labels_cmp = ["\n".join(textwrap.wrap(str(s).replace("_", " "), 12))
+                              for s in comparison.index]
+                fig, ax = plt.subplots(figsize=(8.6, 4.3))
                 x = np.arange(len(comparison))
-                width = 0.35
-                ax.bar(x - width / 2, comparison["Khách sạn"], width, label="Khách sạn", color="#3498db")
-                ax.bar(x + width / 2, comparison["Trung bình hệ thống"], width,
-                       label="Trung bình hệ thống", color="#95a5a6")
+                width = 0.36
+                b1 = ax.bar(x - width / 2, comparison["Khách sạn"], width,
+                            label="Khách sạn", color="#3498db")
+                b2 = ax.bar(x + width / 2, comparison["Trung bình hệ thống"], width,
+                            label="Trung bình hệ thống", color="#95a5a6")
                 ax.set_xticks(x)
-                ax.set_xticklabels(comparison.index, rotation=30, ha="right")
+                ax.set_xticklabels(labels_cmp, fontsize=8.5)
                 ax.set_ylabel("Điểm (/10)")
-                ax.legend()
+                # Keo dai truc Ox/Oy: noi hai dau truc X, chua chuong so + legend o truc Y
+                ax.set_xlim(-0.65, len(comparison) - 0.35)
+                y_top = float(np.nanmax([comparison["Khách sạn"].max(),
+                                         comparison["Trung bình hệ thống"].max()]))
+                ax.set_ylim(0, y_top * 1.30)
+                for bars, col in ((b1, "Khách sạn"), (b2, "Trung bình hệ thống")):
+                    txt = ["" if pd.isna(v) else f"{v:.1f}" for v in comparison[col]]
+                    ax.bar_label(bars, labels=txt, fontsize=7, padding=1)
+                # Legend dat ngoai vung ve de khong che cot cuoi
+                ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.16),
+                          ncol=2, frameon=False, fontsize=9)
+                ax.spines[["top", "right"]].set_visible(False)
+                ax.grid(axis="y", linestyle=":", alpha=0.4)
+                ax.set_axisbelow(True)
                 plt.tight_layout()
                 show_fig(fig, 780)
 
@@ -1451,14 +1467,27 @@ with tab3:
                 if diffs.empty:
                     st.caption("Không đủ dữ liệu để vẽ biểu đồ chênh lệch.")
                 else:
-                    fig2, ax2 = plt.subplots(figsize=(6.3, max(1.26, 0.35 * len(diffs) + 0.56)))
+                    labels_d = [str(s).replace("_", " ") for s in diffs.index]
+                    fig2, ax2 = plt.subplots(
+                        figsize=(8.6, max(2.4, 0.52 * len(diffs) + 1.0))
+                    )
                     colors2 = ["#0E7C86" if v >= 0 else "#E74C3C" for v in diffs]
-                    ax2.barh(diffs.index, diffs.values, color=colors2)
+                    ax2.barh(labels_d, diffs.values, color=colors2, height=0.6)
                     ax2.axvline(0, color="#073B4C", linewidth=0.9)
                     ax2.set_xlabel("Chênh lệch so với trung bình hệ thống (điểm)")
+                    # Noi rong truc Ox de chuong so khong de len nhan truc Oy
+                    lo = min(0.0, float(diffs.min()))
+                    hi = max(0.0, float(diffs.max()))
+                    pad = max((hi - lo) * 0.22, 0.05)
+                    ax2.set_xlim(lo - pad, hi + pad)
+                    ax2.set_ylim(-0.7, len(diffs) - 0.3)
                     for i, v in enumerate(diffs.values):
-                        ax2.text(v + (0.02 if v >= 0 else -0.02), i, f"{v:+.2f}",
-                                  va="center", ha="left" if v >= 0 else "right", fontsize=9)
+                        off = (hi - lo) * 0.02 or 0.01
+                        ax2.text(v + (off if v >= 0 else -off), i, f"{v:+.2f}",
+                                 va="center", ha="left" if v >= 0 else "right", fontsize=9)
+                    ax2.spines[["top", "right"]].set_visible(False)
+                    ax2.grid(axis="x", linestyle=":", alpha=0.4)
+                    ax2.set_axisbelow(True)
                     plt.tight_layout()
                     show_fig(fig2, 780)
 
