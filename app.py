@@ -826,6 +826,7 @@ HERO_HTML = """
     __HERO_BG__
     overflow: hidden;
     text-align: center;
+    border-radius: 0 0 28px 28px;
 }
 .hero-eyebrow {
     display: inline-block;
@@ -866,20 +867,9 @@ HERO_HTML = """
     position: relative;
     z-index: 2;
 }
-.hero-wave {
-    position: absolute;
-    left: 0; right: 0; bottom: -2px;
-    line-height: 0;
-}
-.hero-wave svg { display: block; width: 100%; height: 64px; }
-.hero-wave path { animation: hero-bob 8s ease-in-out infinite; }
-@keyframes hero-bob {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(3px); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .hero-wave path { animation: none !important; }
-}
+/* Da bo hoan toan .hero-wave (SVG song trang tri o day banner) — day la phan tu
+   position:absolute duy nhat nam sat tab bar, nghi ngo la nguyen nhan gay che chu
+   tren mot so trinh duyet/thiet bi ma khong the tai hien de test cuc bo. */
 
 /* Khoi tim kiem thu gon kieu Agoda: the noi, bo, can giua, khong chiem full width */
 .st-key-search_card, .st-key-cf_card, .st-key-insight_card {
@@ -962,12 +952,6 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     <p class="hero-sub">
         Đồ án tốt nghiệp Data Science · Nhóm thực hiện: Kim Thanh – Quang Lợi
     </p>
-    <div class="hero-wave">
-        <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-            <path d="M0,40 C240,80 480,0 720,32 C960,64 1200,16 1440,40 L1440,80 L0,80 Z"
-                  fill="#F4E3C1"></path>
-        </svg>
-    </div>
 </div>
 """.replace("__HERO_BG__", _hero_bg_css)
 st.markdown(HERO_HTML, unsafe_allow_html=True)
