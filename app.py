@@ -376,14 +376,21 @@ def render_comparison_table(comparison: pd.DataFrame):
     st.markdown(html, unsafe_allow_html=True)
 
 
-def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFrame, photos: dict):
+def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFrame,
+                              photos: dict, state_key: str):
     """
-    Trang chi tiet khach san (thay the toan bo noi dung chinh, khong phai popup) —
-    anh, dia chi, tong diem, so luot danh gia, mo ta, va DANH SACH BINH LUAN THAT
-    cua khach de nguoi xem doc thu — giong trang chi tiet cua Agoda.
+    Trang chi tiet khach san (thay the noi dung CHINH CUA DUNG TAB dang xem, khong phai
+    popup, va KHONG an thanh tab di) — anh, dia chi, tong diem, so luot danh gia, mo ta,
+    va DANH SACH BINH LUAN THAT cua khach de nguoi xem doc thu — giong Agoda.
+
+    Luu y ky thuat: co tinh KHONG bao gio bo qua goi st.tabs() o tang tren — Streamlit
+    se "quen" tab dang chon neu widget tabs khong duoc goi lien tuc vai luot chay.
+    Vi vay trang chi tiet nay duoc ve NGAY BEN TRONG than cua dung tab da bam "Xem chi
+    tiet", thay vi thay the toan bo trang — nho vay tab luon duoc goi, khong bao gio mat
+    trang thai, va nguoi dung tu nhien o lai dung tab cu sau khi bam Quay lai.
     """
-    if st.button("← Quay lại danh sách"):
-        del st.session_state["viewing_hotel_id"]
+    if st.button("← Quay lại danh sách", key=f"back_{state_key}"):
+        del st.session_state[state_key]
         st.rerun()
 
     row_match = df_hotel[df_hotel[C_ID] == hotel_id]
@@ -470,14 +477,19 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
             st.rerun()
 
 
-def render_results(df: pd.DataFrame, photos: dict = None):
-    """Hien thi danh sach khach san goi y — the gon, anh dai dien, ten in dam."""
+def render_results(df: pd.DataFrame, photos: dict = None, state_key: str = "viewing_hotel_id"):
+    """
+    Hien thi danh sach khach san goi y — the gon, anh dai dien, ten in dam.
+    state_key: khoa session_state rieng cho tung tab (VD "tab1_viewing_id",
+    "tab2_viewing_id") — de bam Xem chi tiet o tab nao thi chi tab do doi giao dien,
+    khong lam mat trang thai cua thanh tab (xem giai thich trong render_hotel_detail_page).
+    """
     photos = photos or {}
     if df.empty:
         st.warning("Không tìm thấy khách sạn phù hợp. Thử đổi khách sạn khác hoặc mô tả khác.")
         return
     for _, r in df.iterrows():
-        with st.container(border=True, key=f"result_{r.get(C_ID)}"):
+        with st.container(border=True, key=f"result_{state_key}_{r.get(C_ID)}"):
             c_img, c_info, c_score = st.columns([1, 5, 1.3], vertical_alignment="center")
             with c_img:
                 st.markdown(
@@ -498,8 +510,8 @@ def render_results(df: pd.DataFrame, photos: dict = None):
                 if desc:
                     snippet = desc[:110] + ("…" if len(desc) > 110 else "")
                     st.caption(snippet)
-                if st.button("👁 Xem chi tiết", key=f"viewdetail_{r.get(C_ID)}"):
-                    st.session_state["viewing_hotel_id"] = r.get(C_ID)
+                if st.button("👁 Xem chi tiết", key=f"viewdetail_{state_key}_{r.get(C_ID)}"):
+                    st.session_state[state_key] = r.get(C_ID)
                     st.rerun()
             with c_score:
                 st.metric("Điểm", fmt_score(r.get(C_SCORE)))
@@ -1125,50 +1137,55 @@ cf_art = load_cf_model()
 hotel_photos = load_hotel_photos()
 system_avg = compute_system_avg(df_hotel)
 
-# Neu dang xem chi tiet 1 khach san — thay the TOAN BO noi dung chinh bang trang chi tiet
-# (khong phai popup), an het hero + 3 tab di cho giong cam giac "chuyen sang trang moi".
-if "viewing_hotel_id" in st.session_state:
-    render_hotel_detail_page(st.session_state["viewing_hotel_id"], df_hotel, df_cmt, hotel_photos)
-    st.stop()
-
-tab1, tab2, tab3 = st.tabs([
-    "🔍 1. Gợi ý theo nội dung",
-    "👥 2. Gợi ý theo lọc cộng tác",
-    "📊 3. Insight cho chủ khách sạn",
-])
+tab1, tab2, tab3 = st.tabs(
+    [
+        "🔍 1. Gợi ý theo nội dung",
+        "👥 2. Gợi ý theo lọc cộng tác",
+        "📊 3. Insight cho chủ khách sạn",
+    ],
+    key="active_tab_label",
+    on_change="rerun",
+)
 
 # ------------------------------------------------------------------ TAB 1
 with tab1:
-    st.markdown(
-        '<p style="text-align:center; color:#6b7280; font-size:0.875rem;">'
-        'Mô tả điều bạn mong muốn để hệ thống tìm khách sạn phù hợp.</p>',
-        unsafe_allow_html=True,
-    )
-
-    if content_art["cosine_sim"] is None and content_art["vectorizer"] is None:
-        st.error(
-            "Chưa có mô hình content-based. Chạy `python build_hotel_artifacts.py` để tạo "
-            "`cosine_sim.npy`."
-        )
+    if "tab1_viewing_id" in st.session_state:
+        render_hotel_detail_page(st.session_state["tab1_viewing_id"], df_hotel, df_cmt,
+                                  hotel_photos, state_key="tab1_viewing_id")
     else:
-        with st.container(key="search_card"):
-            with st.form("search_form"):
-                query, top_n = render_search_inputs()
-                submitted = st.form_submit_button("🔍 Tìm kiếm", type="primary")
+        st.markdown(
+            '<p style="text-align:center; color:#6b7280; font-size:0.875rem;">'
+            'Mô tả điều bạn mong muốn để hệ thống tìm khách sạn phù hợp.</p>',
+            unsafe_allow_html=True,
+        )
 
-        if submitted:
-            res = search_cosine(df_hotel, content_art, query or "", nums=top_n)
-            st.session_state["tab1_results"] = res
+        if content_art["cosine_sim"] is None and content_art["vectorizer"] is None:
+            st.error(
+                "Chưa có mô hình content-based. Chạy `python build_hotel_artifacts.py` để tạo "
+                "`cosine_sim.npy`."
+            )
+        else:
+            with st.container(key="search_card"):
+                with st.form("search_form"):
+                    query, top_n = render_search_inputs()
+                    submitted = st.form_submit_button("🔍 Tìm kiếm", type="primary")
 
-        if "tab1_results" in st.session_state:
-            st.divider()
-            res = st.session_state["tab1_results"]
-            st.subheader(f"Top {len(res)} khách sạn phù hợp nhất")
-            render_results(res, hotel_photos)
+            if submitted:
+                res = search_cosine(df_hotel, content_art, query or "", nums=top_n)
+                st.session_state["tab1_results"] = res
+
+            if "tab1_results" in st.session_state:
+                st.divider()
+                res = st.session_state["tab1_results"]
+                st.subheader(f"Top {len(res)} khách sạn phù hợp nhất")
+                render_results(res, hotel_photos, state_key="tab1_viewing_id")
 
 # ------------------------------------------------------------------ TAB 2
 with tab2:
-    if cf_art.get("knn") is None or cf_art.get("hotel_index") is None:
+    if "tab2_viewing_id" in st.session_state:
+        render_hotel_detail_page(st.session_state["tab2_viewing_id"], df_hotel, df_cmt,
+                                  hotel_photos, state_key="tab2_viewing_id")
+    elif cf_art.get("knn") is None or cf_art.get("hotel_index") is None:
         st.error(
             "Chưa có mô hình Collaborative filtering. Chạy `python build_hotel_artifacts.py` để tạo "
             "`cf_knn_model.joblib`."
@@ -1200,7 +1217,7 @@ with tab2:
                 st.divider()
                 res_cf = st.session_state["tab2_results"]
                 st.subheader(f"Top {len(res_cf)} khách sạn tương tự (Item-Based KNN)")
-                render_results(res_cf, hotel_photos)
+                render_results(res_cf, hotel_photos, state_key="tab2_viewing_id")
 
 # ------------------------------------------------------------------ TAB 3
 with tab3:
