@@ -600,41 +600,94 @@ def load_quick_suggestion_photo(slug: str):
     return None, None
 
 
-def _apply_quick_suggestion(query_text: str):
+def _apply_quick_suggestion(idx: int):
     """
-    Bam 1 o goi y nhanh: dien mo ta vao o tim kiem, dat co de Tab 1 chay
-    search_cosine ngay o luot chay ke tiep (khong bat nguoi dung bam "Tim kiem" nua),
-    dong thoi nhay ve Tab 1 de thay danh sach ket qua.
-    Callback chay TRUOC than script nen ghi session_state o day la hop le.
+    Bam 1 o goi y nhanh -> mo khu ket qua RIENG ngay duoi dai goi y (khong dinh gi
+    toi o tim kiem cua Tab 1). Callback chay TRUOC than script nen ghi
+    session_state o day la hop le.
     """
-    st.session_state["query"] = query_text
-    st.session_state["top_n"] = QUICK_TOP_N
-    st.session_state["quick_query"] = query_text      # co lenh: tab 1 se tu tim
-    st.session_state.pop("tab1_viewing_id", None)     # thoat trang chi tiet neu dang mo
-    try:
-        st.session_state["active_tab_label"] = TAB1_LABEL
-    except Exception:
-        pass  # ban Streamlit cu khong cho set tab bang code — ket qua van hien o Tab 1
+    st.session_state["quick_active_idx"] = idx
+    st.session_state.pop("quick_viewing_id", None)   # thoat trang chi tiet cu neu dang mo
+
+
+def _close_quick_suggestion():
+    for k in ("quick_active_idx", "quick_results", "quick_results_idx", "quick_viewing_id"):
+        st.session_state.pop(k, None)
+
+
+def quick_suggestion_thumb_html(scene_fn, palette_idx: int, slug: str, label: str,
+                                gid_suffix: str = "", cover: bool = False):
+    """
+    Anh minh hoa cua 1 o goi y -> (html, canh_bao_loi).
+    Uu tien anh that trong assets/quick_suggestions, khong co thi ve SVG minh hoa.
+    cover=True: dung cho banner ngang — SVG duoc cat day khung thay vi de vien trong.
+    """
+    photo_b64, err = load_quick_suggestion_photo(slug)
+    if photo_b64:
+        return f'<img src="data:image/jpeg;base64,{photo_b64}" alt="{label}" loading="lazy"/>', err
+    c1, c2 = PLACEHOLDER_PALETTES[palette_idx]
+    svg = render_scene_svg(scene_fn, c1, c2,
+                           gid=f"sugg-{palette_idx}-{scene_fn.__name__}{gid_suffix}")
+    if cover:
+        svg = svg.replace('<svg viewBox', '<svg preserveAspectRatio="xMidYMid slice" viewBox', 1)
+    return svg, err
 
 
 def render_quick_suggestions():
     """Dai goi y nhanh — hien khi chua tim gi, do trang khong bi trong khi moi vao web."""
-    st.caption("✨ Gợi ý nhanh — chưa biết tìm gì? Bấm 1 ô để xem ngay top "
-               f"{QUICK_TOP_N} khách sạn theo phong cách đó")
+    st.caption("✨ Gợi ý nhanh — chưa biết tìm gì? Bấm 1 chủ đề để xem ngay top "
+               f"{QUICK_TOP_N} khách sạn hợp chủ đề đó")
+    active = st.session_state.get("quick_active_idx")
     cols = st.columns(len(QUICK_SUGGESTIONS))
-    for col, (label, query_text, scene_fn, palette_idx, slug) in zip(cols, QUICK_SUGGESTIONS):
-        photo_b64, err = load_quick_suggestion_photo(slug)
-        if photo_b64:
-            thumb_html = f'<img src="data:image/jpeg;base64,{photo_b64}" alt="{label}" loading="lazy"/>'
-        else:
-            c1, c2 = PLACEHOLDER_PALETTES[palette_idx]
-            thumb_html = render_scene_svg(scene_fn, c1, c2, gid=f"sugg-{palette_idx}-{scene_fn.__name__}")
+    for i, (col, item) in enumerate(zip(cols, QUICK_SUGGESTIONS)):
+        label, query_text, scene_fn, palette_idx, slug = item
+        thumb_html, err = quick_suggestion_thumb_html(scene_fn, palette_idx, slug, label)
         with col:
             st.markdown(f'<div class="hotel-thumb">{thumb_html}</div>', unsafe_allow_html=True)
-            st.button(label, key=f"sugg_{scene_fn.__name__}", use_container_width=True,
-                      on_click=_apply_quick_suggestion, args=(query_text,))
+            st.button(label, key=f"sugg_{slug}", use_container_width=True,
+                      type="primary" if i == active else "secondary",
+                      on_click=_apply_quick_suggestion, args=(i,))
             if err:
                 st.caption(f"⚠️ {err}")
+
+
+def render_quick_suggestion_results(df_hotel: pd.DataFrame, art: dict, photos: dict):
+    """
+    Khu ket qua rieng cua goi y nhanh: tieu de = ten chu de, kem anh minh hoa
+    cua chinh o do, roi den danh sach khach sang tuong ung (bam xem duoc chi tiet).
+    """
+    idx = st.session_state.get("quick_active_idx")
+    if idx is None or idx >= len(QUICK_SUGGESTIONS):
+        return
+    label, query_text, scene_fn, palette_idx, slug = QUICK_SUGGESTIONS[idx]
+
+    st.divider()
+    if "quick_viewing_id" in st.session_state:
+        render_hotel_detail_page(st.session_state["quick_viewing_id"], df_hotel, df_cmt,
+                                 photos, state_key="quick_viewing_id")
+        return
+
+    # Tieu de = ten chu de + anh minh hoa cua o vua bam
+    thumb_html, _ = quick_suggestion_thumb_html(scene_fn, palette_idx, slug, label,
+                                                gid_suffix="-hero", cover=True)
+    st.markdown(f'<div class="quick-hero-title">{label}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="quick-hero">{thumb_html}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="quick-hero-desc">{query_text}</div>', unsafe_allow_html=True)
+
+    # Chi tinh lai khi doi chu de — tranh chay search moi luot rerun
+    if st.session_state.get("quick_results_idx") != idx:
+        st.session_state["quick_results"] = search_cosine(
+            df_hotel, art, query_text, nums=QUICK_TOP_N
+        )
+        st.session_state["quick_results_idx"] = idx
+
+    res = st.session_state["quick_results"]
+    if res is None or res.empty:
+        st.info("Chưa tìm được khách sạn phù hợp với chủ đề này.")
+        return
+    st.markdown(f"##### Top {len(res)} khách sạn cho chủ đề “{label}”")
+    render_results(res, photos, state_key="quick_viewing_id")
+    st.button("✕ Đóng gợi ý này", key="close_quick", on_click=_close_quick_suggestion)
 
 
 def render_hotel_picker(df_hotel: pd.DataFrame, key: str):
@@ -1075,6 +1128,32 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     border-color: var(--agoda-blue-dark) !important;
 }
 
+/* Khu ket qua goi y nhanh: tieu de chu de + anh minh hoa banner */
+.quick-hero-title {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: var(--deepsea);
+    margin: 0.2rem 0 0.55rem 0;
+}
+.quick-hero {
+    border-radius: 16px;
+    overflow: hidden;
+    line-height: 0;
+    box-shadow: 0 6px 18px rgba(7, 59, 76, 0.16);
+}
+.quick-hero img, .quick-hero svg {
+    width: 100%;
+    height: 260px;
+    object-fit: cover;
+    display: block;
+}
+.quick-hero-desc {
+    color: #4b5563;
+    font-size: 0.95rem;
+    font-style: italic;
+    margin: 0.6rem 0 0.2rem 0;
+}
+
 /* The ket qua khach san: gon hon, anh dai dien, ten to & dam ro rang */
 .hotel-thumb svg {
     width: 100%;
@@ -1215,14 +1294,6 @@ with tab1:
                 "`cosine_sim.npy`."
             )
         else:
-            # O goi y nhanh vua duoc bam -> tim ngay top 5, khong can bam "Tim kiem"
-            pending_quick = st.session_state.pop("quick_query", None)
-            if pending_quick:
-                st.session_state["tab1_results"] = search_cosine(
-                    df_hotel, content_art, pending_quick, nums=QUICK_TOP_N
-                )
-                st.session_state["tab1_query_label"] = pending_quick
-
             with st.container(key="search_card"):
                 with st.form("search_form"):
                     query, top_n = render_search_inputs()
@@ -1531,3 +1602,4 @@ with tab3:
 # hay chua, cho trang sinh dong hon thay vi bien mat sau khi bam tim.
 st.divider()
 render_quick_suggestions()
+render_quick_suggestion_results(df_hotel, content_art, hotel_photos)
