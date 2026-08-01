@@ -538,7 +538,7 @@ def render_results(df: pd.DataFrame, photos: dict = None, state_key: str = "view
                     st.rerun()
             with c_score:
                 st.metric("Điểm", fmt_score(r.get(C_SCORE)))
-                st.caption(f"Tương đồng **{r['similarity']:.2f}**")
+                # st.caption(f"Tương đồng **{r['similarity']:.2f}**")
 
 
 
@@ -1387,7 +1387,7 @@ with tab2:
             if "tab2_results" in st.session_state:
                 st.divider()
                 res_cf = st.session_state["tab2_results"]
-                st.subheader(f"Top {len(res_cf)} khách sạn tương tự (Item-Based KNN)")
+                st.subheader(f"Top {len(res_cf)} khách sạn tương tự")
                 render_results(res_cf, hotel_photos, state_key="tab2_viewing_id")
 
 # ------------------------------------------------------------------ TAB 3
