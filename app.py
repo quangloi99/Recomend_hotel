@@ -878,7 +878,7 @@ HERO_HTML = """
     box-shadow: 0 18px 40px -18px rgba(6,34,46,0.35);
     padding: 1.5rem 1.7rem 1.2rem 1.7rem;
     max-width: 760px;
-    margin: -2.2rem auto 1.6rem auto;
+    margin: 1.2rem auto 1.6rem auto;
     position: relative;
     z-index: 5;
 }
