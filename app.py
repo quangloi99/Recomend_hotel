@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import re
+import textwrap
 import urllib.parse
 from collections import Counter
 
@@ -87,6 +88,7 @@ POSITIVE_THRESHOLD = 8    # danh gia >= 8 diem: hai long (khop notebook)
 NEGATIVE_THRESHOLD = 6    # danh gia < 6 diem: khong hai long (khop notebook)
 TOP_N_DEFAULT = 5
 TOP_KEYWORDS = 15
+MIN_PIE_PCT = 5           # lat pie < 5% se duoc gop vao nhom "Khac" cho de nhin
 
 # Stopword rieng cho phan phan tich tu khoa insight — khop Project1_Request3.ipynb
 VIETNAMESE_STOPWORDS = set("""
@@ -1299,24 +1301,71 @@ with tab3:
             if cust is None:
                 st.info("Khách sạn chưa có đánh giá nào.")
             else:
-                c1, c2 = st.columns(2)
+                c1, c2 = st.columns([1, 1.4])
                 with c1:
-                    if not cust["nationality"].empty:
-                        fig, ax = plt.subplots(figsize=(3.5, 3.5))
-                        ax.pie(cust["nationality"].values, labels=cust["nationality"].index,
-                               autopct="%1.0f%%", startangle=90)
-                        ax.set_title("Top quốc tịch khách hàng")
-                        st.pyplot(fig, width=390)
+                    nat = cust["nationality"].astype(float)
+                    nat = nat[nat > 0].sort_values(ascending=False)
+                    if nat.sum() > 0:
+                        # Gop cac lat < MIN_PIE_PCT% vao mot nhom "Khac" cho de nhin
+                        total_nat = nat.sum()
+                        share = nat / total_nat * 100
+                        major = nat[share >= MIN_PIE_PCT]
+                        minor = nat[share < MIN_PIE_PCT]
+                        if len(minor) > 0:
+                            other_label = f"Khác ({len(minor)} quốc tịch)"
+                            major = pd.concat(
+                                [major, pd.Series({other_label: minor.sum()})]
+                            )
+                        fig, ax = plt.subplots(figsize=(3.6, 4.0))
+                        colors = plt.get_cmap("tab20").colors[: len(major)]
+                        wedges, _, autotexts = ax.pie(
+                            major.values,
+                            autopct="%1.0f%%",
+                            startangle=90,
+                            counterclock=False,
+                            colors=colors,
+                            pctdistance=0.72,
+                            wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
+                        )
+                        for t in autotexts:
+                            t.set_fontsize(8.5)
+                            t.set_color("white")
+                            t.set_fontweight("bold")
+                        ax.set_title("Top quốc tịch khách hàng", fontsize=11)
+                        ax.legend(
+                            wedges,
+                            [f"{k} · {v / total_nat * 100:.0f}%" for k, v in major.items()],
+                            loc="upper center",
+                            bbox_to_anchor=(0.5, 0.02),
+                            ncol=2,
+                            fontsize=7.5,
+                            frameon=False,
+                        )
+                        plt.tight_layout()
+                        st.pyplot(fig, width=350)
                         plt.close(fig)
                 with c2:
                     if not cust["group"].empty:
-                        fig, ax = plt.subplots(figsize=(3.5, 3.5))
-                        cust["group"].plot(kind="bar", ax=ax, color="#3498db")
-                        ax.set_title("Hình thức đi du lịch")
+                        grp = cust["group"].sort_values(ascending=False)
+                        pos = np.arange(len(grp))
+                        labels = ["\n".join(textwrap.wrap(str(s), 11)) for s in grp.index]
+                        fig, ax = plt.subplots(figsize=(5.6, 4.0))
+                        ax.bar(pos, grp.values, color="#3498db", width=0.55)
+                        ax.set_title("Hình thức đi du lịch", fontsize=11)
                         ax.set_ylabel("Số lượt đánh giá")
-                        ax.tick_params(axis="x", rotation=30)
+                        ax.set_xlabel("")
+                        ax.set_xticks(pos)
+                        ax.set_xticklabels(labels, fontsize=8)
+                        # Keo dai truc Ox de cac nhan khong bi dinh nhau
+                        ax.set_xlim(-0.7, len(grp) - 0.3)
+                        ax.set_ylim(0, float(grp.max()) * 1.18)
+                        for x, v in zip(pos, grp.values):
+                            ax.text(x, v, f"{int(v)}", ha="center", va="bottom", fontsize=8)
+                        ax.spines[["top", "right"]].set_visible(False)
+                        ax.grid(axis="y", linestyle=":", alpha=0.4)
+                        ax.set_axisbelow(True)
                         plt.tight_layout()
-                        st.pyplot(fig, width=390)
+                        st.pyplot(fig, width=520)
                         plt.close(fig)
                 if len(cust["trend"]) > 1:
                     fig, ax = plt.subplots(figsize=(7, 2.45))
