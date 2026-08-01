@@ -814,12 +814,14 @@ HERO_HTML = """
     --agoda-blue-dark: #164FA3;
 }
 
-/* Da bo ep padding-top:0 — de Streamlit tu dung khoang dem mac dinh, tranh va cham
-   voi thanh cong cu noi cua Streamlit Cloud (Fork/GitHub/Deploy) khi cuon trang. */
+/* Them khoang dem TREN CUNG rong rai, chu dinh ro rang (khong dua vao mac dinh Streamlit
+   mo ho) — de dam bao KHONG BAO GIO bi thanh cong cu noi cua Streamlit Cloud
+   (Fork/GitHub/Deploy) de len tren banner/tab bar, du cuon hay resize the nao. */
+.block-container { padding-top: 3.5rem !important; }
 
 .hero-wrap {
     position: relative;
-    margin: -1rem -1rem 1.75rem -1rem;
+    margin: 0 -1rem 1.75rem -1rem;
     padding: 3.2rem 2.2rem 3.6rem 2.2rem;
     __HERO_BG__
     overflow: hidden;
