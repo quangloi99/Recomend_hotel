@@ -414,10 +414,16 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
         st.caption("Khách sạn này chưa có đánh giá nào.")
         return
 
-    st.caption(f"Hiển thị {min(10, len(reviews))} / {len(reviews)} đánh giá — điểm cao nhất trước.")
-    reviews_sorted = reviews.sort_values(CM_SCORE, ascending=False, na_position="last").head(10)
+    # Moi khach san co bo dem rieng — de khong bi "nho nham" so luong tu khach san truoc
+    shown_key = f"reviews_shown_{hotel_id}"
+    if shown_key not in st.session_state:
+        st.session_state[shown_key] = 10
+    show_n = st.session_state[shown_key]
 
-    for _, rv in reviews_sorted.iterrows():
+    reviews_sorted = reviews.sort_values(CM_SCORE, ascending=False, na_position="last")
+    st.caption(f"Hiển thị {min(show_n, len(reviews))} / {len(reviews)} đánh giá — điểm cao nhất trước.")
+
+    for _, rv in reviews_sorted.head(show_n).iterrows():
         with st.container(border=True):
             meta_bits = []
             reviewer = rv.get("Reviewer_Name")
@@ -446,6 +452,11 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
             body = rv.get(CM_BODY)
             if pd.notna(body) and str(body).strip():
                 st.write(body)
+
+    if show_n < len(reviews):
+        if st.button(f"Xem thêm đánh giá ({len(reviews) - show_n} còn lại)", key=f"more_{hotel_id}"):
+            st.session_state[shown_key] += 10
+            st.rerun()
 
 
 def render_results(df: pd.DataFrame, photos: dict = None):
