@@ -979,7 +979,11 @@ def recommend_for_user(df_hotel: pd.DataFrame, ucf: dict, user_id: str, nums=5):
     sup_map = {hotels[i]: den[i] for i in order}
     out["predicted"] = out[C_ID].astype(str).map(pred_map)
     out["support"] = out[C_ID].astype(str).map(sup_map)
-    return out.sort_values("predicted", ascending=False).head(nums), method
+    out = out.sort_values("predicted", ascending=False)
+    # Cung mot khach san co the nam trong du lieu duoi NHIEU Hotel_ID khac nhau
+    # (trung ten + dia chi) -> loc ca hai kieu trung, giu ban co diem du doan cao nhat
+    out = out.drop_duplicates(subset=[C_ID]).drop_duplicates(subset=[C_NAME, C_ADDR])
+    return out.head(nums), method
 
 
 def _recommend_by_segment(df_hotel: pd.DataFrame, ucf: dict, user_id: str, nums=5):
@@ -1012,7 +1016,11 @@ def _recommend_by_segment(df_hotel: pd.DataFrame, ucf: dict, user_id: str, nums=
     out["predicted"] = out[C_ID].astype(str).map(agg["predicted"])
     out["support"] = out[C_ID].astype(str).map(agg["support"])
     method = f"Nhóm khách cùng đặc điểm ({me[CM_NATION]} · {me[CM_GROUP]})"
-    return out.sort_values("predicted", ascending=False).head(nums), method
+    out = out.sort_values("predicted", ascending=False)
+    # Cung mot khach san co the nam trong du lieu duoi NHIEU Hotel_ID khac nhau
+    # (trung ten + dia chi) -> loc ca hai kieu trung, giu ban co diem du doan cao nhat
+    out = out.drop_duplicates(subset=[C_ID]).drop_duplicates(subset=[C_NAME, C_ADDR])
+    return out.head(nums), method
 
 
 def get_knn_similar_hotels(df_hotel: pd.DataFrame, cf_art: dict, hotel_id, nums=5) -> pd.DataFrame:
@@ -1064,7 +1072,9 @@ def get_knn_similar_hotels(df_hotel: pd.DataFrame, cf_art: dict, hotel_id, nums=
 
     out = df_hotel[df_hotel[C_ID].isin(ids)].copy()
     out["similarity"] = out[C_ID].map(lambda h: 1 - dist_map[h])
-    return out.sort_values("similarity", ascending=False)
+    return (out.sort_values("similarity", ascending=False)
+               .drop_duplicates(subset=[C_ID])
+               .drop_duplicates(subset=[C_NAME, C_ADDR]))
 
 
 # ---- Yeu cau 3: Insight (khop tung ham trong Project1_Request3.ipynb) ----
