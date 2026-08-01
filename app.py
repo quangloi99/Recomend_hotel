@@ -908,13 +908,9 @@ def build_user_cf() -> dict:
         .reset_index()
     )
     profiles["User_ID"] = ["U" + str(i + 1).zfill(5) for i in range(len(profiles))]
-    # Nhan hien thi = dung 3 dac diem gom nhom (ten · quoc tich · hinh thuc di du lich).
-    # Bo 3 nay la duy nhat cho moi user (chinh la khoa groupby) nen nhan khong bao gio
-    # trung -> tra nguoc tu nhan ve User_ID luon chinh xac.
-    profiles["label"] = (
-        profiles[CM_REVIEWER] + " · " + profiles[CM_NATION] + " · " + profiles[CM_GROUP]
-        + " — " + profiles["n_reviews"].astype(str) + " đánh giá"
-    )
+    # Nguoi dung duoc xac dinh bang dung bo 3 (CM_REVIEWER, CM_NATION, CM_GROUP) —
+    # cung chinh la khoa groupby — nen giao dien chi can 3 o chon la ra 1 nguoi duy nhat,
+    # khong can them ma dinh danh nao hien ra man hinh.
 
     df = df.merge(profiles[CF_USER_KEYS + ["User_ID"]], on=CF_USER_KEYS, how="left")
 
@@ -1606,62 +1602,53 @@ with tab2:
                 pool = profiles
 
             with st.container(key="cf_card"):
-                # KHONG dung st.form o day: cac o loc phai lam moi danh sach khach hang
-                # NGAY khi go chu. Widget trong form chi giao gia tri luc bam submit nen
-                # o tim ten se khong loc duoc gi cho toi khi bam nut — dung ngoai form
-                # thi moi lan go la mot luot chay moi, danh sach thu hep theo thoi gian thuc.
+                # KHONG dung st.form o day: o loc phai lam moi danh sach ten NGAY khi go chu.
+                # Widget trong form chi giao gia tri luc bam submit nen o tim ten se khong
+                # loc duoc gi cho toi khi bam nut — dat ngoai form thi moi lan go la mot
+                # luot chay moi, danh sach ten thu hep theo thoi gian thuc.
+                #
+                # Nguoi dung duoc xac dinh bang DUNG 3 dac diem (khoa gom nhom), nen chon
+                # du ca 3 la ra dung mot nguoi — khong can dropdown "chon khach hang" nua.
                 f1, f2 = st.columns(2)
                 with f1:
                     nat = st.selectbox(
                         "Quốc tịch",
-                        ["Tất cả"] + sorted(pool[CM_NATION].unique().tolist()),
+                        sorted(pool[CM_NATION].unique().tolist()),
                         key="cf_nat",
                     )
                 with f2:
-                    grp = st.selectbox(
-                        "Hình thức đi du lịch",
-                        ["Tất cả"] + sorted(pool[CM_GROUP].unique().tolist()),
-                        key="cf_grp",
-                    )
-                name_kw = st.text_input(
-                    "Tìm theo tên khách hàng",
-                    key="cf_name_kw",
-                    placeholder="Nhập tên, VD: Nam, An, Nguyễn… (bỏ trống để xem tất cả)",
-                )
+                    grp_opts = sorted(pool.loc[pool[CM_NATION] == nat, CM_GROUP].unique().tolist())
+                    grp = st.selectbox("Hình thức đi du lịch", grp_opts, key="cf_grp")
 
-                sub = pool
-                if nat != "Tất cả":
-                    sub = sub[sub[CM_NATION] == nat]
-                if grp != "Tất cả":
-                    sub = sub[sub[CM_GROUP] == grp]
+                sub = pool[(pool[CM_NATION] == nat) & (pool[CM_GROUP] == grp)]
+                sub = sub.sort_values("n_reviews", ascending=False)
+
+                name_kw = st.text_input(
+                    "Lọc nhanh theo tên (không bắt buộc)",
+                    key="cf_name_kw",
+                    placeholder="VD: Nam, An, Nguyễn… — không cần gõ dấu",
+                )
                 if name_kw.strip():
                     # So khop khong phan biet HOA/thuong va KHONG phan biet dau
                     # -> go "an" van ra "Ân", go "Nguyen" van ra "Nguyễn"
                     kw = strip_accents(name_kw.strip().lower())
-                    mask = sub[CM_REVIEWER].map(lambda s: kw in strip_accents(str(s).lower()))
-                    sub = sub[mask]
-                sub = sub.sort_values("n_reviews", ascending=False)
+                    sub = sub[sub[CM_REVIEWER].map(lambda s: kw in strip_accents(str(s).lower()))]
 
                 if sub.empty:
-                    st.warning("Không có khách hàng nào khớp bộ lọc. Thử đổi tên hoặc bỏ bớt điều kiện.")
+                    st.warning("Không có khách hàng nào khớp. Thử đổi tên hoặc đổi quốc tịch / hình thức.")
                     cf_submitted = False
-                    picked_label = None
+                    picked_name = None
                     cf_top_n = TOP_N_DEFAULT
                 else:
-                    # Danh sach co the len hang nghin nguoi -> chi do vao selectbox mot phan
                     shown = sub.head(CF_USER_LIST_MAX)
                     if len(sub) > CF_USER_LIST_MAX:
                         st.caption(
-                            f"Tìm thấy {len(sub):,} khách hàng — đang hiển thị "
-                            f"{CF_USER_LIST_MAX} người có nhiều đánh giá nhất. "
-                            "Gõ thêm chữ để thu hẹp."
+                            f"Có {len(sub):,} khách hàng thuộc nhóm này — đang hiển thị "
+                            f"{CF_USER_LIST_MAX} người nhiều đánh giá nhất. Gõ tên để thu hẹp."
                         )
-                    else:
-                        st.caption(f"Tìm thấy {len(sub):,} khách hàng phù hợp.")
-
-                    picked_label = st.selectbox(
-                        "Chọn khách hàng",
-                        shown["label"].tolist(),
+                    picked_name = st.selectbox(
+                        "Tên khách hàng",
+                        shown[CM_REVIEWER].tolist(),
                         key="cf_user",
                         help=f"Chỉ hiển thị khách hàng có từ {CF_USER_MIN_REVIEWS} đánh giá trở lên.",
                     )
@@ -1669,7 +1656,10 @@ with tab2:
                     cf_submitted = st.button("👥 Gợi ý khách sạn", type="primary", key="cf_go")
 
             if cf_submitted and not sub.empty:
-                row = sub[sub["label"] == picked_label]
+                # 3 dac diem chinh la khoa gom nhom -> tra ve dung 1 nguoi duy nhat
+                row = sub[(sub[CM_REVIEWER] == picked_name)
+                          & (sub[CM_NATION] == nat)
+                          & (sub[CM_GROUP] == grp)]
                 if not row.empty:
                     uid = row["User_ID"].iloc[0]
                     res_cf, method = recommend_for_user(df_hotel, ucf, uid, nums=cf_top_n)
