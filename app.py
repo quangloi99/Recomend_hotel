@@ -91,6 +91,10 @@ NEGATIVE_THRESHOLD = 6    # danh gia < 6 diem: khong hai long (khop notebook)
 TOP_N_DEFAULT = 5
 TOP_KEYWORDS = 15
 MIN_PIE_PCT = 5           # lat pie < 5% se duoc gop vao nhom "Khac" cho de nhin
+QUICK_TOP_N = 5           # bam o goi y nhanh -> tra ve top 5 khach san
+TAB1_LABEL = "🔍 1. Gợi ý theo nội dung"
+TAB2_LABEL = "👥 2. Gợi ý theo lọc cộng tác"
+TAB3_LABEL = "📊 3. Insight cho chủ khách sạn"
 
 # Stopword rieng cho phan phan tich tu khoa insight — khop Project1_Request3.ipynb
 VIETNAMESE_STOPWORDS = set("""
@@ -597,12 +601,26 @@ def load_quick_suggestion_photo(slug: str):
 
 
 def _apply_quick_suggestion(query_text: str):
+    """
+    Bam 1 o goi y nhanh: dien mo ta vao o tim kiem, dat co de Tab 1 chay
+    search_cosine ngay o luot chay ke tiep (khong bat nguoi dung bam "Tim kiem" nua),
+    dong thoi nhay ve Tab 1 de thay danh sach ket qua.
+    Callback chay TRUOC than script nen ghi session_state o day la hop le.
+    """
     st.session_state["query"] = query_text
+    st.session_state["top_n"] = QUICK_TOP_N
+    st.session_state["quick_query"] = query_text      # co lenh: tab 1 se tu tim
+    st.session_state.pop("tab1_viewing_id", None)     # thoat trang chi tiet neu dang mo
+    try:
+        st.session_state["active_tab_label"] = TAB1_LABEL
+    except Exception:
+        pass  # ban Streamlit cu khong cho set tab bang code — ket qua van hien o Tab 1
 
 
 def render_quick_suggestions():
     """Dai goi y nhanh — hien khi chua tim gi, do trang khong bi trong khi moi vao web."""
-    st.caption("✨ Gợi ý nhanh — bấm để tìm khách sạn theo phong cách bạn thích")
+    st.caption("✨ Gợi ý nhanh — chưa biết tìm gì? Bấm 1 ô để xem ngay top "
+               f"{QUICK_TOP_N} khách sạn theo phong cách đó")
     cols = st.columns(len(QUICK_SUGGESTIONS))
     for col, (label, query_text, scene_fn, palette_idx, slug) in zip(cols, QUICK_SUGGESTIONS):
         photo_b64, err = load_quick_suggestion_photo(slug)
@@ -1174,11 +1192,7 @@ hotel_photos = load_hotel_photos()
 system_avg = compute_system_avg(df_hotel)
 
 tab1, tab2, tab3 = st.tabs(
-    [
-        "🔍 1. Gợi ý theo nội dung",
-        "👥 2. Gợi ý theo lọc cộng tác",
-        "📊 3. Insight cho chủ khách sạn",
-    ],
+    [TAB1_LABEL, TAB2_LABEL, TAB3_LABEL],
     key="active_tab_label",
     on_change="rerun",
 )
@@ -1201,6 +1215,14 @@ with tab1:
                 "`cosine_sim.npy`."
             )
         else:
+            # O goi y nhanh vua duoc bam -> tim ngay top 5, khong can bam "Tim kiem"
+            pending_quick = st.session_state.pop("quick_query", None)
+            if pending_quick:
+                st.session_state["tab1_results"] = search_cosine(
+                    df_hotel, content_art, pending_quick, nums=QUICK_TOP_N
+                )
+                st.session_state["tab1_query_label"] = pending_quick
+
             with st.container(key="search_card"):
                 with st.form("search_form"):
                     query, top_n = render_search_inputs()
@@ -1209,11 +1231,15 @@ with tab1:
             if submitted:
                 res = search_cosine(df_hotel, content_art, query or "", nums=top_n)
                 st.session_state["tab1_results"] = res
+                st.session_state["tab1_query_label"] = query or ""
 
             if "tab1_results" in st.session_state:
                 st.divider()
                 res = st.session_state["tab1_results"]
                 st.subheader(f"Top {len(res)} khách sạn phù hợp nhất")
+                label = st.session_state.get("tab1_query_label", "")
+                if label:
+                    st.caption(f"Theo mô tả: *{label}*")
                 render_results(res, hotel_photos, state_key="tab1_viewing_id")
 
 # ------------------------------------------------------------------ TAB 2
