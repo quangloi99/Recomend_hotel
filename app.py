@@ -482,7 +482,14 @@ def render_results(df: pd.DataFrame, photos: dict = None):
                 )
             with c_info:
                 st.markdown(f'<div class="hotel-card-title">{r.get(C_NAME, "")}</div>', unsafe_allow_html=True)
-                st.caption(f"{r.get(C_RANK, '')} · {r.get(C_ADDR, '')}")
+                st.markdown(
+                    f'<div class="hotel-detail-meta hotel-card-meta">'
+                    f'<span class="meta-star">⭐</span> {r.get(C_RANK, "")}'
+                    f' &nbsp;·&nbsp; '
+                    f'<span class="meta-pin">📍</span> {r.get(C_ADDR, "")}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
                 desc = str(r.get(C_DESC, "") or "")
                 if desc:
                     snippet = desc[:110] + ("…" if len(desc) > 110 else "")
@@ -1055,6 +1062,16 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 }
 .hotel-detail-meta .meta-pin {
     font-size: 1.15rem;
+}
+.hotel-card-meta {
+    font-size: 0.88rem !important;
+    margin-bottom: 0.2rem !important;
+}
+.hotel-card-meta .meta-star {
+    font-size: 1rem;
+}
+.hotel-card-meta .meta-pin {
+    font-size: 0.92rem;
 }
 .hotel-card-title {
     font-family: 'Fraunces', serif;
