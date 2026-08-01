@@ -84,7 +84,19 @@ CM_SCORE = "Score"
 CM_BODY = "Body"
 CM_NATION = "Nationality"
 CM_GROUP = "Group_Name"
+CM_REVIEWER = "Reviewer_Name"
 CM_YEARMONTH = "Review_YearMonth"
+
+# --- Collaborative filtering theo NGUOI DUNG (Yeu cau 2) -------------------
+# Cot "Reviewer ID" trong du lieu goc la duy nhat cho TUNG DONG danh gia (80.314 ID cho
+# 80.314 dong) nen khong dung lam "nguoi dung" duoc — moi user chi co dung 1 danh gia,
+# ma tran User x Hotel khong co su chong lan nao, CF vo nghia.
+# Vi vay dinh danh nguoi dung duoc gom tu bo 3 dac diem: Reviewer_Name + Nationality +
+# Group_Name, roi danh so thanh User_ID (U00001, U00002, ...) — theo dung yeu cau.
+CF_USER_KEYS = [CM_REVIEWER, CM_NATION, CM_GROUP]
+CF_USER_MIN_REVIEWS = 2   # user duoc chon trong app phai co it nhat 2 danh gia
+CF_NEIGHBORS = 60         # so nguoi dung tuong tu lay ra de bo phieu
+CF_SHRINK = 0.5           # he so co gian: uu tien khach san duoc NHIEU hang xom ung ho
 
 POSITIVE_THRESHOLD = 8    # danh gia >= 8 diem: hai long (khop notebook)
 NEGATIVE_THRESHOLD = 6    # danh gia < 6 diem: khong hai long (khop notebook)
@@ -842,6 +854,161 @@ def search_cosine(df_hotel: pd.DataFrame, art: dict, search_str: str, nums=5,
 
 
 # ---- Yeu cau 2: Collaborative filtering (khop Project1_Request2.ipynb) ----
+@st.cache_resource(show_spinner="Đang dựng ma trận Người dùng × Khách sạn…")
+def build_user_cf() -> dict:
+    """
+    Dung mo hinh User-Based Collaborative Filtering NGAY TU hotel_comments (khong can
+    file artifact rieng), theo dung yeu cau: gom khach hang lai bang bo 3 dac diem
+    Reviewer_Name + Nationality + Group_Name -> sinh User_ID -> ma tran User x Hotel.
+
+    Tra ve dict:
+      profiles : DataFrame ho so nguoi dung (User_ID, ten, quoc tich, nhom, so danh gia,
+                 diem trung binh, nhan hien thi)
+      ratings  : DataFrame (User_ID, Hotel_ID, Score) da gop trung lap bang trung binh
+      matrix   : csr_matrix User x Hotel
+      knn      : NearestNeighbors(cosine) da fit tren `matrix`
+      users    : Index User_ID theo dung thu tu dong cua `matrix`
+      hotels   : Index Hotel_ID theo dung thu tu cot cua `matrix`
+    """
+    from scipy.sparse import csr_matrix
+    from sklearn.neighbors import NearestNeighbors
+
+    empty = {"profiles": pd.DataFrame(), "ratings": pd.DataFrame(), "matrix": None,
+             "knn": None, "users": None, "hotels": None}
+    df = load_comments()
+    if df.empty:
+        return empty
+    need = CF_USER_KEYS + [CM_ID, CM_SCORE]
+    if any(c not in df.columns for c in need):
+        return empty
+
+    df = df[need].copy()
+    df[CM_SCORE] = pd.to_numeric(
+        df[CM_SCORE].astype(str).str.replace(",", ".", regex=False), errors="coerce"
+    )
+    df = df.dropna(subset=[CM_SCORE, CM_ID])
+    for col in CF_USER_KEYS:
+        df[col] = df[col].fillna("Không rõ").astype(str).str.strip().replace("", "Không rõ")
+    if df.empty:
+        return empty
+
+    # B1. Gom khach hang -> User_ID
+    profiles = (
+        df.groupby(CF_USER_KEYS, sort=True)
+        .agg(n_reviews=(CM_SCORE, "size"), avg_score=(CM_SCORE, "mean"))
+        .reset_index()
+    )
+    profiles["User_ID"] = ["U" + str(i + 1).zfill(5) for i in range(len(profiles))]
+    profiles["label"] = (
+        profiles["User_ID"] + " · " + profiles[CM_REVIEWER]
+        + " (" + profiles[CM_NATION] + " · " + profiles[CM_GROUP] + ")"
+        + " — " + profiles["n_reviews"].astype(str) + " đánh giá"
+    )
+
+    df = df.merge(profiles[CF_USER_KEYS + ["User_ID"]], on=CF_USER_KEYS, how="left")
+
+    # B2. Mot nguoi co the danh gia cung 1 khach san nhieu lan -> lay trung binh
+    ratings = df.groupby(["User_ID", CM_ID], as_index=False)[CM_SCORE].mean()
+
+    # B3. Ma tran User x Hotel (thua, luu dang sparse cho nhe)
+    users = pd.Index(sorted(ratings["User_ID"].unique()))
+    hotels = pd.Index(sorted(ratings[CM_ID].astype(str).unique()))
+    upos = {u: i for i, u in enumerate(users)}
+    hpos = {h: i for i, h in enumerate(hotels)}
+    matrix = csr_matrix(
+        (ratings[CM_SCORE].to_numpy(float),
+         (ratings["User_ID"].map(upos).to_numpy(), ratings[CM_ID].astype(str).map(hpos).to_numpy())),
+        shape=(len(users), len(hotels)),
+    )
+
+    knn = NearestNeighbors(metric="cosine", algorithm="brute").fit(matrix)
+    return {"profiles": profiles, "ratings": ratings, "matrix": matrix,
+            "knn": knn, "users": users, "hotels": hotels}
+
+
+def recommend_for_user(df_hotel: pd.DataFrame, ucf: dict, user_id: str, nums=5):
+    """
+    Goi y khach san cho 1 nguoi dung theo User-Based CF.
+
+    Cach tinh: tim CF_NEIGHBORS nguoi dung gan nhat theo cosine tren ma tran User x Hotel,
+    roi cham diem moi khach san ung vien bang trung binh diem CO TRONG SO tuong dong:
+        pred(h) = Σ sim(u,v)·rating(v,h) / Σ sim(u,v)     (v: hang xom da danh gia h)
+    Diem xep hang duoc co gian theo so hang xom ung ho — pred · den/(den + CF_SHRINK) —
+    de mot khach san chi duoc DUNG 1 hang xom cham 10 diem khong vuot mat khach san
+    duoc ca chuc nguoi cham 9.5. Khach san nguoi do DA danh gia bi loai khoi ket qua.
+
+    Tra ve (DataFrame ket qua, ten_phuong_phap). Neu nguoi dung khong co hang xom nao
+    trung khach san (cosine = 0 voi tat ca) -> quay ve goi y theo NHOM KHACH cung
+    quoc tich + hinh thuc di du lich, van bam sat 3 dac diem gom nhom.
+    """
+    knn, matrix, users, hotels = ucf.get("knn"), ucf.get("matrix"), ucf.get("users"), ucf.get("hotels")
+    if knn is None or matrix is None or user_id not in users:
+        return pd.DataFrame(), ""
+
+    pos = users.get_loc(user_id)
+    n_query = min(CF_NEIGHBORS + 1, matrix.shape[0])
+    dist, idx = knn.kneighbors(matrix[pos], n_neighbors=n_query)
+    sims = np.clip(1.0 - dist.ravel(), 0.0, None)
+    nb = idx.ravel()
+    keep = (nb != pos) & (sims > 0)
+    sims, nb = sims[keep], nb[keep]
+
+    method = "Người dùng tương tự (User-Based CF)"
+    if len(nb) == 0:
+        return _recommend_by_segment(df_hotel, ucf, user_id, nums)
+
+    nb_mat = matrix[nb]
+    num = np.asarray(nb_mat.multiply(sims[:, None]).sum(axis=0)).ravel()
+    den = np.asarray((nb_mat > 0).multiply(sims[:, None]).sum(axis=0)).ravel()
+    pred = np.divide(num, den, out=np.zeros_like(num), where=den > 0)
+    rank = pred * (den / (den + CF_SHRINK))
+    rank[matrix[pos].indices] = -1.0            # bo khach san da tung danh gia
+    order = np.argsort(-rank)[: max(nums * 6, nums)]
+    order = [i for i in order if rank[i] > 0]
+    if not order:
+        return _recommend_by_segment(df_hotel, ucf, user_id, nums)
+
+    out = df_hotel[df_hotel[C_ID].astype(str).isin(hotels[order])].copy()
+    pred_map = {hotels[i]: pred[i] for i in order}
+    sup_map = {hotels[i]: den[i] for i in order}
+    out["predicted"] = out[C_ID].astype(str).map(pred_map)
+    out["support"] = out[C_ID].astype(str).map(sup_map)
+    return out.sort_values("predicted", ascending=False).head(nums), method
+
+
+def _recommend_by_segment(df_hotel: pd.DataFrame, ucf: dict, user_id: str, nums=5):
+    """
+    Phuong an du phong cho nguoi dung "co doc" (chua trung khach san nao voi ai):
+    lay cac khach san duoc CHINH NHOM KHACH cung Nationality + Group_Name cham diem
+    cao nhat (co uu tien khach san duoc nhieu nguoi trong nhom danh gia).
+    """
+    profiles, ratings = ucf.get("profiles"), ucf.get("ratings")
+    if profiles is None or profiles.empty:
+        return pd.DataFrame(), ""
+    me = profiles[profiles["User_ID"] == user_id]
+    if me.empty:
+        return pd.DataFrame(), ""
+    me = me.iloc[0]
+
+    peers = profiles[(profiles[CM_NATION] == me[CM_NATION])
+                     & (profiles[CM_GROUP] == me[CM_GROUP])]["User_ID"]
+    seg = ratings[ratings["User_ID"].isin(set(peers)) & (ratings["User_ID"] != user_id)]
+    if seg.empty:
+        return pd.DataFrame(), ""
+
+    agg = seg.groupby(CM_ID).agg(predicted=(CM_SCORE, "mean"), support=(CM_SCORE, "size"))
+    agg["rank"] = agg["predicted"] * (agg["support"] / (agg["support"] + 3))
+    mine = set(ratings.loc[ratings["User_ID"] == user_id, CM_ID].astype(str))
+    agg = agg[~agg.index.astype(str).isin(mine)].sort_values("rank", ascending=False)
+
+    top_ids = agg.head(max(nums * 6, nums)).index.astype(str)
+    out = df_hotel[df_hotel[C_ID].astype(str).isin(set(top_ids))].copy()
+    out["predicted"] = out[C_ID].astype(str).map(agg["predicted"])
+    out["support"] = out[C_ID].astype(str).map(agg["support"])
+    method = f"Nhóm khách cùng đặc điểm ({me[CM_NATION]} · {me[CM_GROUP]})"
+    return out.sort_values("predicted", ascending=False).head(nums), method
+
+
 def get_knn_similar_hotels(df_hotel: pd.DataFrame, cf_art: dict, hotel_id, nums=5) -> pd.DataFrame:
     """
     Khop buoc 'Thu tim Hotel gan nhat' trong notebook — NearestNeighbors(metric='cosine')
@@ -1406,38 +1573,93 @@ with tab2:
     if "tab2_viewing_id" in st.session_state:
         render_hotel_detail_page(st.session_state["tab2_viewing_id"], df_hotel, df_cmt,
                                   hotel_photos, state_key="tab2_viewing_id")
-    elif cf_art.get("knn") is None or cf_art.get("hotel_index") is None:
-        st.error(
-            "Chưa có mô hình Collaborative filtering. Chạy `python build_hotel_artifacts.py` để tạo "
-            "`cf_knn_model.joblib`."
-        )
     else:
-        cf_hotel_ids = set(cf_art["hotel_index"][C_ID])
-        cf_hotel_names = df_hotel.loc[df_hotel[C_ID].isin(cf_hotel_ids), C_NAME].tolist()
-
-        if not cf_hotel_names:
-            st.warning("Không có khách sạn nào đủ dữ liệu đánh giá để dùng Collaborative filtering.")
+        ucf = build_user_cf()
+        profiles = ucf.get("profiles")
+        if profiles is None or profiles.empty:
+            st.error(
+                "Chưa dựng được ma trận Người dùng × Khách sạn. Cần file "
+                "`hotel_comments_clean.pkl` có các cột Reviewer_Name, Nationality, "
+                "Group_Name, Hotel_ID, Score."
+            )
         else:
+            st.caption(
+                f"Đã gom **{len(profiles):,} người dùng** từ bộ 3 đặc điểm "
+                f"*Reviewer Name + Nationality + Group Name* trên "
+                f"{len(ucf['ratings']):,} lượt đánh giá của {len(ucf['hotels']):,} khách sạn."
+            )
+
+            # Chi cho chon nguoi dung co du lieu du de goi y
+            pool = profiles[profiles["n_reviews"] >= CF_USER_MIN_REVIEWS]
+            if pool.empty:
+                pool = profiles
+
             with st.container(key="cf_card"):
                 with st.form("cf_form"):
-                    picked_name = st.selectbox(
-                        "Khách sạn bạn đang quan tâm",
-                        cf_hotel_names,
-                        key="cf_hotel",
-                        help="Chỉ hiển thị các khách sạn đã có ít nhất 1 đánh giá trong dữ liệu.",
+                    f1, f2 = st.columns(2)
+                    with f1:
+                        nat = st.selectbox(
+                            "Quốc tịch",
+                            ["Tất cả"] + sorted(pool[CM_NATION].unique().tolist()),
+                            key="cf_nat",
+                        )
+                    with f2:
+                        grp = st.selectbox(
+                            "Hình thức đi du lịch",
+                            ["Tất cả"] + sorted(pool[CM_GROUP].unique().tolist()),
+                            key="cf_grp",
+                        )
+                    sub = pool
+                    if nat != "Tất cả":
+                        sub = sub[sub[CM_NATION] == nat]
+                    if grp != "Tất cả":
+                        sub = sub[sub[CM_GROUP] == grp]
+                    sub = sub.sort_values("n_reviews", ascending=False)
+
+                    picked_label = st.selectbox(
+                        "Chọn khách hàng",
+                        sub["label"].tolist() if not sub.empty else ["(không có khách hàng phù hợp)"],
+                        key="cf_user",
+                        help=f"Chỉ hiển thị khách hàng có từ {CF_USER_MIN_REVIEWS} đánh giá trở lên.",
                     )
                     cf_top_n = st.slider("Số khách sạn gợi ý", 3, 20, TOP_N_DEFAULT, key="cf_top_n")
-                    cf_submitted = st.form_submit_button("👥 Tìm kiếm", type="primary")
+                    cf_submitted = st.form_submit_button("👥 Gợi ý khách sạn", type="primary")
 
-            if cf_submitted:
-                picked_id = df_hotel.loc[df_hotel[C_NAME] == picked_name, C_ID].iloc[0]
-                res_cf = get_knn_similar_hotels(df_hotel, cf_art, picked_id, nums=cf_top_n)
-                st.session_state["tab2_results"] = res_cf
+            if cf_submitted and not sub.empty:
+                row = sub[sub["label"] == picked_label]
+                if not row.empty:
+                    uid = row["User_ID"].iloc[0]
+                    res_cf, method = recommend_for_user(df_hotel, ucf, uid, nums=cf_top_n)
+                    st.session_state["tab2_results"] = res_cf
+                    st.session_state["tab2_user"] = row.iloc[0].to_dict()
+                    st.session_state["tab2_method"] = method
 
             if "tab2_results" in st.session_state:
                 st.divider()
+                u = st.session_state.get("tab2_user", {})
+                if u:
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Mã người dùng", u.get("User_ID", "—"))
+                    m2.metric("Quốc tịch", u.get(CM_NATION, "—"))
+                    m3.metric("Hình thức", u.get(CM_GROUP, "—"))
+                    m4.metric("Số đánh giá", f"{u.get('n_reviews', 0)}")
+
+                    hist = ucf["ratings"]
+                    hist = hist[hist["User_ID"] == u.get("User_ID")]
+                    if not hist.empty:
+                        names = df_hotel.set_index(df_hotel[C_ID].astype(str))[C_NAME]
+                        with st.expander(f"Khách sạn khách này đã đánh giá ({len(hist)})"):
+                            show = pd.DataFrame({
+                                "Khách sạn": hist[CM_ID].astype(str).map(names).fillna(hist[CM_ID]),
+                                "Điểm đã chấm": hist[CM_SCORE].round(1),
+                            }).sort_values("Điểm đã chấm", ascending=False)
+                            st.dataframe(show, hide_index=True, use_container_width=True)
+
                 res_cf = st.session_state["tab2_results"]
-                st.subheader(f"Top {len(res_cf)} khách sạn tương tự")
+                method = st.session_state.get("tab2_method", "")
+                st.subheader(f"Top {len(res_cf)} khách sạn gợi ý cho khách hàng này")
+                if method:
+                    st.caption(f"Cách gợi ý: {method}")
                 render_results(res_cf, hotel_photos, state_key="tab2_viewing_id",
                                show_similarity=False)
 
