@@ -24,6 +24,8 @@ Yeu cau 3 — Insight cho chu khach san (khop Project1_Request3.ipynb):
 """
 from __future__ import annotations
 
+import base64
+import io
 import os
 import re
 import textwrap
@@ -214,6 +216,21 @@ def fmt_score(x) -> str:
         return f"{float(str(x).strip().replace(',', '.')):.1f}"
     except (ValueError, TypeError):
         return "—"
+
+
+def show_fig(fig, width: int | None = None):
+    """Ve figure matplotlib CAN GIUA khoi chua (st.pyplot mac dinh can trai)."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=160, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    size = f"width:{width}px;" if width else ""
+    st.markdown(
+        '<div style="display:flex;justify-content:center;width:100%">'
+        f'<img src="data:image/png;base64,{b64}" style="{size}max-width:100%;height:auto"/>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 # Bang mau (dung de phoi mau cho tung minh hoa) — theo dung tong mau hero
@@ -1298,8 +1315,7 @@ with tab3:
                 for i, v in enumerate(scores.values):
                     ax.text(v + 0.1, i, f"{v:.1f}", va="center")
                 plt.tight_layout()
-                st.pyplot(fig, width=780)
-                plt.close(fig)
+                show_fig(fig, 780)
                 st.caption(
                     f"Mạnh nhất: **{scores.index[0]}** ({scores.iloc[0]:.1f}) · "
                     f"Yếu nhất: **{scores.index[-1]}** ({scores.iloc[-1]:.1f})"
@@ -1351,8 +1367,7 @@ with tab3:
                             frameon=False,
                         )
                         plt.tight_layout()
-                        st.pyplot(fig, width=350)
-                        plt.close(fig)
+                        show_fig(fig, 350)
                 with c2:
                     if not cust["group"].empty:
                         grp = cust["group"].sort_values(ascending=False)
@@ -1374,8 +1389,7 @@ with tab3:
                         ax.grid(axis="y", linestyle=":", alpha=0.4)
                         ax.set_axisbelow(True)
                         plt.tight_layout()
-                        st.pyplot(fig, width=520)
-                        plt.close(fig)
+                        show_fig(fig, 520)
                 if len(cust["trend"]) > 1:
                     fig, ax = plt.subplots(figsize=(7, 2.45))
                     cust["trend"].plot(ax=ax, marker="o", color="#e67e22")
@@ -1383,8 +1397,7 @@ with tab3:
                     ax.set_xlabel("Tháng")
                     ax.set_ylabel("Số lượt đánh giá")
                     plt.tight_layout()
-                    st.pyplot(fig, width=780)
-                    plt.close(fig)
+                    show_fig(fig, 780)
 
             st.subheader("4. Từ khoá nổi bật")
             kw = rep["keywords"]
@@ -1401,8 +1414,7 @@ with tab3:
                         ax.barh(words[::-1], counts[::-1], color="#2ecc71")
                         ax.set_title("Top từ khoá — Tích cực")
                         plt.tight_layout()
-                        st.pyplot(fig, width=390)
-                        plt.close(fig)
+                        show_fig(fig, 390)
                     else:
                         st.caption("Không đủ dữ liệu đánh giá tích cực.")
                 with c2:
@@ -1412,8 +1424,7 @@ with tab3:
                         ax.barh(words_n[::-1], counts_n[::-1], color="#e74c3c")
                         ax.set_title("Top từ khoá — Tiêu cực")
                         plt.tight_layout()
-                        st.pyplot(fig, width=390)
-                        plt.close(fig)
+                        show_fig(fig, 390)
                     else:
                         st.caption("Không đủ dữ liệu đánh giá tiêu cực để phân tích.")
 
@@ -1433,8 +1444,7 @@ with tab3:
                 ax.set_ylabel("Điểm (/10)")
                 ax.legend()
                 plt.tight_layout()
-                st.pyplot(fig, width=780)
-                plt.close(fig)
+                show_fig(fig, 780)
 
                 # Bieu do ngang rieng cho Chenh lech — de hinh dung cao/thap va am/duong
                 diffs = comparison["Chênh lệch"].dropna()
@@ -1450,8 +1460,7 @@ with tab3:
                         ax2.text(v + (0.02 if v >= 0 else -0.02), i, f"{v:+.2f}",
                                   va="center", ha="left" if v >= 0 else "right", fontsize=9)
                     plt.tight_layout()
-                    st.pyplot(fig2, width=780)
-                    plt.close(fig2)
+                    show_fig(fig2, 780)
 
                 render_comparison_table(comparison)
 
