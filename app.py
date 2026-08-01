@@ -395,7 +395,14 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
     st.markdown(f'<div class="hotel-detail-thumb">{thumb_html}</div>', unsafe_allow_html=True)
 
     st.title(row.get(C_NAME, ""))
-    st.caption(f"{row.get(C_RANK, '')} · 📍 {row.get(C_ADDR, '')}")
+    st.markdown(
+        f'<div class="hotel-detail-meta">'
+        f'<span class="meta-star">⭐</span> {row.get(C_RANK, "")}'
+        f' &nbsp;·&nbsp; '
+        f'<span class="meta-pin">📍</span> {row.get(C_ADDR, "")}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     c1, c2 = st.columns(2)
     c1.metric("Tổng điểm", f"{fmt_score(row.get(C_SCORE))}/10")
@@ -1036,6 +1043,18 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 }
 @media (max-width: 700px) {
     .hotel-detail-thumb svg, .hotel-detail-thumb img { width: 80% !important; max-width: 80% !important; }
+}
+.hotel-detail-meta {
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    color: var(--deepsea) !important;
+    margin-bottom: 1rem;
+}
+.hotel-detail-meta .meta-star {
+    font-size: 1.35rem;
+}
+.hotel-detail-meta .meta-pin {
+    font-size: 1.15rem;
 }
 .hotel-card-title {
     font-family: 'Fraunces', serif;
