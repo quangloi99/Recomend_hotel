@@ -95,7 +95,6 @@ CM_YEARMONTH = "Review_YearMonth"
 # Group_Name, roi danh so thanh User_ID (U00001, U00002, ...) — theo dung yeu cau.
 CF_USER_KEYS = [CM_REVIEWER, CM_NATION, CM_GROUP]
 CF_USER_MIN_REVIEWS = 2   # user duoc chon trong app phai co it nhat 2 danh gia
-CF_USER_LIST_MAX = 200    # so nguoi toi da do vao selectbox (tranh dropdown qua nang)
 CF_NEIGHBORS = 60         # so nguoi dung tuong tu lay ra de bo phieu
 CF_SHRINK = 0.5           # he so co gian: uu tien khach san duoc NHIEU hang xom ung ho
 
@@ -1602,70 +1601,62 @@ with tab2:
                 pool = profiles
 
             with st.container(key="cf_card"):
-                # KHONG dung st.form o day: o loc phai lam moi danh sach ten NGAY khi go chu.
-                # Widget trong form chi giao gia tri luc bam submit nen o tim ten se khong
-                # loc duoc gi cho toi khi bam nut — dat ngoai form thi moi lan go la mot
-                # luot chay moi, danh sach ten thu hep theo thoi gian thuc.
-                #
-                # Nguoi dung duoc xac dinh bang DUNG 3 dac diem (khoa gom nhom), nen chon
-                # du ca 3 la ra dung mot nguoi — khong can dropdown "chon khach hang" nua.
+                # 3 o nhap doc lap, KHONG o nao khoa o nao, KHONG chon san gia tri mac dinh.
+                # Nguoi dung duoc xac dinh bang dung bo 3 (ten + quoc tich + hinh thuc)
+                # — cung chinh la khoa gom nhom — nen nhap du 3 la ra 1 nguoi duy nhat.
                 f1, f2 = st.columns(2)
                 with f1:
                     nat = st.selectbox(
                         "Quốc tịch",
                         sorted(pool[CM_NATION].unique().tolist()),
+                        index=None,
+                        placeholder="Chọn quốc tịch…",
                         key="cf_nat",
                     )
                 with f2:
-                    grp_opts = sorted(pool.loc[pool[CM_NATION] == nat, CM_GROUP].unique().tolist())
-                    grp = st.selectbox("Hình thức đi du lịch", grp_opts, key="cf_grp")
-
-                sub = pool[(pool[CM_NATION] == nat) & (pool[CM_GROUP] == grp)]
-                sub = sub.sort_values("n_reviews", ascending=False)
-
-                name_kw = st.text_input(
-                    "Lọc nhanh theo tên (không bắt buộc)",
-                    key="cf_name_kw",
+                    grp = st.selectbox(
+                        "Hình thức đi du lịch",
+                        sorted(pool[CM_GROUP].unique().tolist()),
+                        index=None,
+                        placeholder="Chọn hình thức…",
+                        key="cf_grp",
+                    )
+                picked_name = st.text_input(
+                    "Tên khách hàng",
+                    key="cf_name",
                     placeholder="VD: Nam, An, Nguyễn… — không cần gõ dấu",
                 )
-                if name_kw.strip():
-                    # So khop khong phan biet HOA/thuong va KHONG phan biet dau
-                    # -> go "an" van ra "Ân", go "Nguyen" van ra "Nguyễn"
-                    kw = strip_accents(name_kw.strip().lower())
-                    sub = sub[sub[CM_REVIEWER].map(lambda s: kw in strip_accents(str(s).lower()))]
+                cf_top_n = st.slider("Số khách sạn gợi ý", 3, 20, TOP_N_DEFAULT, key="cf_top_n")
+                cf_submitted = st.button("👥 Gợi ý khách sạn", type="primary", key="cf_go")
 
-                if sub.empty:
-                    st.warning("Không có khách hàng nào khớp. Thử đổi tên hoặc đổi quốc tịch / hình thức.")
-                    cf_submitted = False
-                    picked_name = None
-                    cf_top_n = TOP_N_DEFAULT
+            if cf_submitted:
+                if not nat or not grp or not picked_name.strip():
+                    st.warning("Vui lòng nhập đủ cả 3: Quốc tịch, Hình thức đi du lịch và Tên khách hàng.")
                 else:
-                    shown = sub.head(CF_USER_LIST_MAX)
-                    if len(sub) > CF_USER_LIST_MAX:
-                        st.caption(
-                            f"Có {len(sub):,} khách hàng thuộc nhóm này — đang hiển thị "
-                            f"{CF_USER_LIST_MAX} người nhiều đánh giá nhất. Gõ tên để thu hẹp."
-                        )
-                    picked_name = st.selectbox(
-                        "Tên khách hàng",
-                        shown[CM_REVIEWER].tolist(),
-                        key="cf_user",
-                        help=f"Chỉ hiển thị khách hàng có từ {CF_USER_MIN_REVIEWS} đánh giá trở lên.",
-                    )
-                    cf_top_n = st.slider("Số khách sạn gợi ý", 3, 20, TOP_N_DEFAULT, key="cf_top_n")
-                    cf_submitted = st.button("👥 Gợi ý khách sạn", type="primary", key="cf_go")
+                    sub = pool[(pool[CM_NATION] == nat) & (pool[CM_GROUP] == grp)]
+                    kw = strip_accents(picked_name.strip().lower())
+                    norm = sub[CM_REVIEWER].map(lambda s: strip_accents(str(s).lower()))
+                    row = sub[norm == kw]                       # uu tien trung chinh xac ten
+                    if row.empty:
+                        row = sub[norm.str.contains(kw, regex=False, na=False)]  # roi moi tim gan dung
+                    row = row.sort_values("n_reviews", ascending=False)
 
-            if cf_submitted and not sub.empty:
-                # 3 dac diem chinh la khoa gom nhom -> tra ve dung 1 nguoi duy nhat
-                row = sub[(sub[CM_REVIEWER] == picked_name)
-                          & (sub[CM_NATION] == nat)
-                          & (sub[CM_GROUP] == grp)]
-                if not row.empty:
-                    uid = row["User_ID"].iloc[0]
-                    res_cf, method = recommend_for_user(df_hotel, ucf, uid, nums=cf_top_n)
-                    st.session_state["tab2_results"] = res_cf
-                    st.session_state["tab2_user"] = row.iloc[0].to_dict()
-                    st.session_state["tab2_method"] = method
+                    if row.empty:
+                        st.warning(
+                            f"Không tìm thấy khách hàng tên “{picked_name.strip()}” trong nhóm "
+                            f"{nat} · {grp}. Thử tên khác hoặc đổi quốc tịch / hình thức."
+                        )
+                    else:
+                        if len(row) > 1:
+                            st.info(
+                                f"Có {len(row)} khách hàng khớp tên — đang lấy người nhiều đánh giá "
+                                f"nhất: **{row[CM_REVIEWER].iloc[0]}** ({row['n_reviews'].iloc[0]} đánh giá)."
+                            )
+                        uid = row["User_ID"].iloc[0]
+                        res_cf, method = recommend_for_user(df_hotel, ucf, uid, nums=cf_top_n)
+                        st.session_state["tab2_results"] = res_cf
+                        st.session_state["tab2_user"] = row.iloc[0].to_dict()
+                        st.session_state["tab2_method"] = method
 
             if "tab2_results" in st.session_state:
                 st.divider()
