@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import re
+import urllib.parse
 from collections import Counter
 
 import joblib
@@ -395,11 +396,14 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
     st.markdown(f'<div class="hotel-detail-thumb">{thumb_html}</div>', unsafe_allow_html=True)
 
     st.title(row.get(C_NAME, ""))
+    address_text = str(row.get(C_ADDR, "") or "")
+    maps_url = "https://www.google.com/maps/search/?api=1&query=" + urllib.parse.quote(address_text)
     st.markdown(
         f'<div class="hotel-detail-meta">'
         f'<span class="meta-star">⭐</span> {row.get(C_RANK, "")}'
         f' &nbsp;·&nbsp; '
-        f'<span class="meta-pin">📍</span> {row.get(C_ADDR, "")}'
+        f'<span class="meta-pin">📍</span> '
+        f'<a href="{maps_url}" target="_blank" class="meta-map-link">{address_text}</a>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -1062,6 +1066,13 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 }
 .hotel-detail-meta .meta-pin {
     font-size: 1.15rem;
+}
+.meta-map-link {
+    color: var(--agoda-blue) !important;
+    text-decoration: none !important;
+}
+.meta-map-link:hover {
+    text-decoration: underline !important;
 }
 .hotel-card-meta {
     font-size: 0.88rem !important;
