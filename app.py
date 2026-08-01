@@ -908,9 +908,11 @@ def build_user_cf() -> dict:
         .reset_index()
     )
     profiles["User_ID"] = ["U" + str(i + 1).zfill(5) for i in range(len(profiles))]
+    # Nhan hien thi = dung 3 dac diem gom nhom (ten · quoc tich · hinh thuc di du lich).
+    # Bo 3 nay la duy nhat cho moi user (chinh la khoa groupby) nen nhan khong bao gio
+    # trung -> tra nguoc tu nhan ve User_ID luon chinh xac.
     profiles["label"] = (
-        profiles["User_ID"] + " · " + profiles[CM_REVIEWER]
-        + " (" + profiles[CM_NATION] + " · " + profiles[CM_GROUP] + ")"
+        profiles[CM_REVIEWER] + " · " + profiles[CM_NATION] + " · " + profiles[CM_GROUP]
         + " — " + profiles["n_reviews"].astype(str) + " đánh giá"
     )
 
@@ -1680,7 +1682,7 @@ with tab2:
                 u = st.session_state.get("tab2_user", {})
                 if u:
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("Mã người dùng", u.get("User_ID", "—"))
+                    m1.metric("Khách hàng", u.get(CM_REVIEWER, "—"))
                     m2.metric("Quốc tịch", u.get(CM_NATION, "—"))
                     m3.metric("Hình thức", u.get(CM_GROUP, "—"))
                     m4.metric("Số đánh giá", f"{u.get('n_reviews', 0)}")
