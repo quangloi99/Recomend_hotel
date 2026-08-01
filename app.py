@@ -571,16 +571,20 @@ QUICK_SUGGESTIONS_DIR = os.path.join(ASSETS_DIR, "quick_suggestions")
 
 
 @st.cache_data
-def load_quick_suggestion_photo(slug: str):
+def load_quick_suggestion_photo(slug: str, target: tuple = (640, 640), quality: int = 82):
     """
     Tim anh that cho 1 o goi y nhanh trong assets/quick_suggestions/{slug}.(jpg|jpeg|png|webp).
-    Neu co: resize vuong 640x640 + encode base64. Neu khong tim thay file nao -> (None, None).
+    Cat theo ty le `target` roi encode base64. Neu khong tim thay file nao -> (None, None).
     Neu tim thay file nhung KHONG doc duoc (anh hong/sai dinh dang thuc su ben trong)
     -> (None, thong_bao_loi) de UI hien canh bao ro rang thay vi im lang lui ve SVG.
+
+    Quan trong: KHONG BAO GIO phong to vuot kich thuoc anh goc — neu anh goc nho hon
+    `target` thi giu nguyen do phan giai toi da co the (dung ty le), tranh anh bi vo.
     """
     import base64
     import io
 
+    tw, th = target
     for ext in (".jpg", ".jpeg", ".png", ".webp"):
         fname = f"{slug}{ext}"
         fpath = os.path.join(QUICK_SUGGESTIONS_DIR, fname)
@@ -591,9 +595,17 @@ def load_quick_suggestion_photo(slug: str):
             im = Image.open(fpath)
             im.load()  # bat loi giai ma that su ngay tai day (Image.open chi doc header)
             im = im.convert("RGB")
-            im = ImageOps.fit(im, (640, 640), method=Image.LANCZOS)
+            # Khung lon nhat cung ty le target ma anh goc chua duoc
+            ar = tw / th
+            if im.width / im.height >= ar:
+                fit_w = int(im.height * ar)
+            else:
+                fit_w = im.width
+            scale = min(1.0, fit_w / tw)
+            out = (max(1, int(tw * scale)), max(1, int(th * scale)))
+            im = ImageOps.fit(im, out, method=Image.LANCZOS)
             buf = io.BytesIO()
-            im.save(buf, "JPEG", quality=82, optimize=True)
+            im.save(buf, "JPEG", quality=quality, optimize=True)
             return base64.b64encode(buf.getvalue()).decode("ascii"), None
         except Exception as exc:
             return None, f"Không đọc được `{fname}`: {exc}"
@@ -622,7 +634,11 @@ def quick_suggestion_thumb_html(scene_fn, palette_idx: int, slug: str, label: st
     Uu tien anh that trong assets/quick_suggestions, khong co thi ve SVG minh hoa.
     cover=True: dung cho banner ngang — SVG duoc cat day khung thay vi de vien trong.
     """
-    photo_b64, err = load_quick_suggestion_photo(slug)
+    if cover:
+        # Banner ngang: cat theo ty le 12:5 va lay do phan giai cao hon o thumbnail
+        photo_b64, err = load_quick_suggestion_photo(slug, target=(1440, 600), quality=88)
+    else:
+        photo_b64, err = load_quick_suggestion_photo(slug)
     if photo_b64:
         return f'<img src="data:image/jpeg;base64,{photo_b64}" alt="{label}" loading="lazy"/>', err
     c1, c2 = PLACEHOLDER_PALETTES[palette_idx]
@@ -1133,17 +1149,21 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     font-size: 1.55rem;
     font-weight: 800;
     color: var(--deepsea);
-    margin: 0.2rem 0 0.55rem 0;
+    margin: 0.2rem auto 0.55rem auto;
+    max-width: 1040px;
 }
 .quick-hero {
     border-radius: 16px;
     overflow: hidden;
     line-height: 0;
     box-shadow: 0 6px 18px rgba(7, 59, 76, 0.16);
+    max-width: 1040px;      /* khong keo anh rong het man hinh -> khong bi vo */
+    margin: 0 auto;
 }
 .quick-hero img, .quick-hero svg {
     width: 100%;
-    height: 260px;
+    aspect-ratio: 12 / 5;   /* dung ty le, khong ep chieu cao co dinh */
+    height: auto;
     object-fit: cover;
     display: block;
 }
@@ -1151,7 +1171,8 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     color: #4b5563;
     font-size: 0.95rem;
     font-style: italic;
-    margin: 0.6rem 0 0.2rem 0;
+    margin: 0.6rem auto 0.2rem auto;
+    max-width: 1040px;
 }
 
 /* The ket qua khach san: gon hon, anh dai dien, ten to & dam ro rang */
