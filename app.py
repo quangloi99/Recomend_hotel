@@ -1099,6 +1099,12 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     font-weight: 600;
     color: #262730;
 }
+.overview-address {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #262730;
+    line-height: 1.35;
+}
 .hotel-card-meta {
     font-size: 0.88rem !important;
     margin-bottom: 0.2rem !important;
@@ -1269,8 +1275,11 @@ with tab3:
             with c3:
                 _overview_stat("💬", "Số lượt đánh giá", f"{int(ov['comments_count']):,}".replace(",", "."))
             with c4:
-                st.markdown('<div class="overview-label">📍 Địa chỉ</div>', unsafe_allow_html=True)
-                st.caption(ov["Hotel_Address"])
+                st.markdown(
+                    '<div class="overview-label">📍 Địa chỉ</div>'
+                    f'<div class="overview-address">{ov["Hotel_Address"]}</div>',
+                    unsafe_allow_html=True,
+                )
 
             st.subheader("2. Điểm mạnh & điểm yếu")
             scores = rep["scores"]
