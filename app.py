@@ -375,18 +375,26 @@ def render_comparison_table(comparison: pd.DataFrame):
     st.markdown(html, unsafe_allow_html=True)
 
 
-@st.dialog("Chi tiết khách sạn", width="large")
-def render_hotel_detail_dialog(row: pd.Series, photos: dict):
+def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFrame, photos: dict):
     """
-    Popup chi tiet khach san khi bam 'Xem chi tiet' tu danh sach goi y —
-    anh, dia chi, tong diem, so luot danh gia (giong demo Agoda da duyet).
+    Trang chi tiet khach san (thay the toan bo noi dung chinh, khong phai popup) —
+    anh, dia chi, tong diem, so luot danh gia, mo ta, va DANH SACH BINH LUAN THAT
+    cua khach de nguoi xem doc thu — giong trang chi tiet cua Agoda.
     """
-    thumb_html = hotel_thumb_html(row.get(C_ID), row.get(C_NAME, ""), photos)
-    st.markdown(
-        f'<div class="hotel-detail-thumb">{thumb_html}</div>',
-        unsafe_allow_html=True,
-    )
-    st.subheader(row.get(C_NAME, ""))
+    if st.button("← Quay lại danh sách"):
+        del st.session_state["viewing_hotel_id"]
+        st.rerun()
+
+    row_match = df_hotel[df_hotel[C_ID] == hotel_id]
+    if row_match.empty:
+        st.error("Không tìm thấy khách sạn này.")
+        return
+    row = row_match.iloc[0]
+
+    thumb_html = hotel_thumb_html(hotel_id, row.get(C_NAME, ""), photos)
+    st.markdown(f'<div class="hotel-detail-thumb">{thumb_html}</div>', unsafe_allow_html=True)
+
+    st.title(row.get(C_NAME, ""))
     st.caption(f"{row.get(C_RANK, '')} · 📍 {row.get(C_ADDR, '')}")
 
     c1, c2 = st.columns(2)
@@ -398,6 +406,47 @@ def render_hotel_detail_dialog(row: pd.Series, photos: dict):
     if desc:
         st.divider()
         st.write(desc)
+
+    st.divider()
+    st.subheader("💬 Đánh giá từ khách")
+    reviews = df_cmt[df_cmt[CM_ID] == hotel_id] if not df_cmt.empty and CM_ID in df_cmt.columns else pd.DataFrame()
+    if reviews.empty:
+        st.caption("Khách sạn này chưa có đánh giá nào.")
+        return
+
+    show_n = st.slider("Số bình luận hiển thị", 3, min(30, len(reviews)),
+                        min(10, len(reviews)), key="detail_review_count")
+    reviews_sorted = reviews.sort_values(CM_SCORE, ascending=False, na_position="last").head(show_n)
+
+    for _, rv in reviews_sorted.iterrows():
+        with st.container(border=True):
+            meta_bits = []
+            reviewer = rv.get("Reviewer_Name")
+            if pd.notna(reviewer):
+                meta_bits.append(f"**{reviewer}**")
+            nation = rv.get(CM_NATION)
+            if pd.notna(nation):
+                meta_bits.append(str(nation))
+            group = rv.get(CM_GROUP)
+            if pd.notna(group):
+                meta_bits.append(str(group))
+            room = rv.get("Room_Type")
+            if pd.notna(room):
+                meta_bits.append(str(room))
+            if meta_bits:
+                st.caption(" · ".join(meta_bits))
+
+            score = rv.get(CM_SCORE)
+            if pd.notna(score):
+                st.markdown(f"**⭐ {float(score):.1f}/10**")
+
+            title = rv.get("Title")
+            if pd.notna(title) and str(title).strip():
+                st.markdown(f"*{title}*")
+
+            body = rv.get(CM_BODY)
+            if pd.notna(body) and str(body).strip():
+                st.write(body)
 
 
 def render_results(df: pd.DataFrame, photos: dict = None):
@@ -422,7 +471,8 @@ def render_results(df: pd.DataFrame, photos: dict = None):
                     snippet = desc[:110] + ("…" if len(desc) > 110 else "")
                     st.caption(snippet)
                 if st.button("👁 Xem chi tiết", key=f"viewdetail_{r.get(C_ID)}"):
-                    render_hotel_detail_dialog(r, photos)
+                    st.session_state["viewing_hotel_id"] = r.get(C_ID)
+                    st.rerun()
             with c_score:
                 st.metric("Điểm", fmt_score(r.get(C_SCORE)))
                 st.caption(f"Tương đồng **{r['similarity']:.2f}**")
@@ -963,12 +1013,13 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     border-radius: 12px;
 }
 .hotel-detail-thumb svg, .hotel-detail-thumb img {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    display: block;
-    border-radius: 12px;
-    margin-bottom: 0.8rem;
+    width: 100% !important;
+    max-width: 100% !important;
+    aspect-ratio: 1 / 1 !important;
+    object-fit: cover !important;
+    display: block !important;
+    border-radius: 12px !important;
+    margin-bottom: 0.8rem !important;
 }
 .hotel-card-title {
     font-family: 'Fraunces', serif;
@@ -1010,6 +1061,12 @@ content_art = load_content_model()
 cf_art = load_cf_model()
 hotel_photos = load_hotel_photos()
 system_avg = compute_system_avg(df_hotel)
+
+# Neu dang xem chi tiet 1 khach san — thay the TOAN BO noi dung chinh bang trang chi tiet
+# (khong phai popup), an het hero + 3 tab di cho giong cam giac "chuyen sang trang moi".
+if "viewing_hotel_id" in st.session_state:
+    render_hotel_detail_page(st.session_state["viewing_hotel_id"], df_hotel, df_cmt, hotel_photos)
+    st.stop()
 
 tab1, tab2, tab3 = st.tabs([
     "🔍 1. Gợi ý theo nội dung",
