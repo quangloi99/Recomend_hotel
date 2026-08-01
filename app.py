@@ -814,7 +814,8 @@ HERO_HTML = """
     --agoda-blue-dark: #164FA3;
 }
 
-.block-container { padding-top: 0 !important; }
+/* Da bo ep padding-top:0 — de Streamlit tu dung khoang dem mac dinh, tranh va cham
+   voi thanh cong cu noi cua Streamlit Cloud (Fork/GitHub/Deploy) khi cuon trang. */
 
 .hero-wrap {
     position: relative;
