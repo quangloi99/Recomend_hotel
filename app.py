@@ -1279,15 +1279,15 @@ with tab3:
                           for v in scores.values]
                 # Chieu cao ty le theo so tieu chi thuc co — tranh 1 thanh duy nhat bi keo
                 # gian day het chieu cao co dinh khi khach san chi co du lieu 1-2 tieu chi.
-                fig_height = max(1.6, 0.55 * len(scores) + 0.9)
-                fig, ax = plt.subplots(figsize=(8, fig_height))
+                fig_height = max(1.12, 0.385 * len(scores) + 0.63)
+                fig, ax = plt.subplots(figsize=(5.6, fig_height))
                 ax.barh(scores.index, scores.values, color=colors, height=0.55)
                 ax.set_xlabel("Điểm (/10)")
                 ax.set_xlim(0, 10)
                 for i, v in enumerate(scores.values):
                     ax.text(v + 0.1, i, f"{v:.1f}", va="center")
                 plt.tight_layout()
-                st.pyplot(fig)
+                st.pyplot(fig, width=780)
                 plt.close(fig)
                 st.caption(
                     f"Mạnh nhất: **{scores.index[0]}** ({scores.iloc[0]:.1f}) · "
@@ -1302,30 +1302,30 @@ with tab3:
                 c1, c2 = st.columns(2)
                 with c1:
                     if not cust["nationality"].empty:
-                        fig, ax = plt.subplots(figsize=(5, 5))
+                        fig, ax = plt.subplots(figsize=(3.5, 3.5))
                         ax.pie(cust["nationality"].values, labels=cust["nationality"].index,
                                autopct="%1.0f%%", startangle=90)
                         ax.set_title("Top quốc tịch khách hàng")
-                        st.pyplot(fig)
+                        st.pyplot(fig, width=390)
                         plt.close(fig)
                 with c2:
                     if not cust["group"].empty:
-                        fig, ax = plt.subplots(figsize=(5, 5))
+                        fig, ax = plt.subplots(figsize=(3.5, 3.5))
                         cust["group"].plot(kind="bar", ax=ax, color="#3498db")
                         ax.set_title("Hình thức đi du lịch")
                         ax.set_ylabel("Số lượt đánh giá")
                         ax.tick_params(axis="x", rotation=30)
                         plt.tight_layout()
-                        st.pyplot(fig)
+                        st.pyplot(fig, width=390)
                         plt.close(fig)
                 if len(cust["trend"]) > 1:
-                    fig, ax = plt.subplots(figsize=(10, 3.5))
+                    fig, ax = plt.subplots(figsize=(7, 2.45))
                     cust["trend"].plot(ax=ax, marker="o", color="#e67e22")
                     ax.set_title("Xu hướng số lượt đánh giá theo thời gian")
                     ax.set_xlabel("Tháng")
                     ax.set_ylabel("Số lượt đánh giá")
                     plt.tight_layout()
-                    st.pyplot(fig)
+                    st.pyplot(fig, width=780)
                     plt.close(fig)
 
             st.subheader("4. Từ khoá nổi bật")
@@ -1339,22 +1339,22 @@ with tab3:
                 with c1:
                     if kw["positive_top"]:
                         words, counts = zip(*kw["positive_top"])
-                        fig, ax = plt.subplots(figsize=(6, 4.5))
+                        fig, ax = plt.subplots(figsize=(4.2, 3.15))
                         ax.barh(words[::-1], counts[::-1], color="#2ecc71")
                         ax.set_title("Top từ khoá — Tích cực")
                         plt.tight_layout()
-                        st.pyplot(fig)
+                        st.pyplot(fig, width=390)
                         plt.close(fig)
                     else:
                         st.caption("Không đủ dữ liệu đánh giá tích cực.")
                 with c2:
                     if kw["negative_top"]:
                         words_n, counts_n = zip(*kw["negative_top"])
-                        fig, ax = plt.subplots(figsize=(6, 4.5))
+                        fig, ax = plt.subplots(figsize=(4.2, 3.15))
                         ax.barh(words_n[::-1], counts_n[::-1], color="#e74c3c")
                         ax.set_title("Top từ khoá — Tiêu cực")
                         plt.tight_layout()
-                        st.pyplot(fig)
+                        st.pyplot(fig, width=390)
                         plt.close(fig)
                     else:
                         st.caption("Không đủ dữ liệu đánh giá tiêu cực để phân tích.")
@@ -1364,7 +1364,7 @@ with tab3:
             if comparison is None or comparison.empty:
                 st.info("Không đủ dữ liệu để so sánh.")
             else:
-                fig, ax = plt.subplots(figsize=(9, 4.5))
+                fig, ax = plt.subplots(figsize=(6.3, 3.15))
                 x = np.arange(len(comparison))
                 width = 0.35
                 ax.bar(x - width / 2, comparison["Khách sạn"], width, label="Khách sạn", color="#3498db")
@@ -1375,7 +1375,7 @@ with tab3:
                 ax.set_ylabel("Điểm (/10)")
                 ax.legend()
                 plt.tight_layout()
-                st.pyplot(fig)
+                st.pyplot(fig, width=780)
                 plt.close(fig)
 
                 # Bieu do ngang rieng cho Chenh lech — de hinh dung cao/thap va am/duong
@@ -1383,7 +1383,7 @@ with tab3:
                 if diffs.empty:
                     st.caption("Không đủ dữ liệu để vẽ biểu đồ chênh lệch.")
                 else:
-                    fig2, ax2 = plt.subplots(figsize=(9, max(1.8, 0.5 * len(diffs) + 0.8)))
+                    fig2, ax2 = plt.subplots(figsize=(6.3, max(1.26, 0.35 * len(diffs) + 0.56)))
                     colors2 = ["#0E7C86" if v >= 0 else "#E74C3C" for v in diffs]
                     ax2.barh(diffs.index, diffs.values, color=colors2)
                     ax2.axvline(0, color="#073B4C", linewidth=0.9)
@@ -1392,7 +1392,7 @@ with tab3:
                         ax2.text(v + (0.02 if v >= 0 else -0.02), i, f"{v:+.2f}",
                                   va="center", ha="left" if v >= 0 else "right", fontsize=9)
                     plt.tight_layout()
-                    st.pyplot(fig2)
+                    st.pyplot(fig2, width=780)
                     plt.close(fig2)
 
                 render_comparison_table(comparison)
