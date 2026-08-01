@@ -95,6 +95,13 @@ QUICK_TOP_N = 5           # bam o goi y nhanh -> tra ve top 5 khach san
 TAB1_LABEL = "🔍 1. Gợi ý theo nội dung"
 TAB2_LABEL = "👥 2. Gợi ý theo lọc cộng tác"
 TAB3_LABEL = "📊 3. Insight cho chủ khách sạn"
+TAB4_LABEL = "👋 4. Về nhóm thực hiện"
+
+# Thanh vien nhom — (ho ten, email, vai tro)
+TEAM_MEMBERS = [
+    ("Phan Kim Thanh", "phankt@gmail.com", "Thành viên thực hiện"),
+    ("Nguyễn Quang Lợi", "nguyenquang1099@gmail.com", "Thành viên thực hiện"),
+]
 
 # Stopword rieng cho phan phan tich tu khoa insight — khop Project1_Request3.ipynb
 VIETNAMESE_STOPWORDS = set("""
@@ -500,12 +507,14 @@ def render_hotel_detail_page(hotel_id, df_hotel: pd.DataFrame, df_cmt: pd.DataFr
             st.rerun()
 
 
-def render_results(df: pd.DataFrame, photos: dict = None, state_key: str = "viewing_hotel_id"):
+def render_results(df: pd.DataFrame, photos: dict = None, state_key: str = "viewing_hotel_id",
+                   show_similarity: bool = True):
     """
     Hien thi danh sach khach san goi y — the gon, anh dai dien, ten in dam.
     state_key: khoa session_state rieng cho tung tab (VD "tab1_viewing_id",
     "tab2_viewing_id") — de bam Xem chi tiet o tab nao thi chi tab do doi giao dien,
     khong lam mat trang thai cua thanh tab (xem giai thich trong render_hotel_detail_page).
+    show_similarity: False -> an dong "Tuong dong" (dung cho Yeu cau 2).
     """
     photos = photos or {}
     if df.empty:
@@ -538,7 +547,8 @@ def render_results(df: pd.DataFrame, photos: dict = None, state_key: str = "view
                     st.rerun()
             with c_score:
                 st.metric("Điểm", fmt_score(r.get(C_SCORE)))
-                # st.caption(f"Tương đồng **{r['similarity']:.2f}**")
+                if show_similarity and "similarity" in df.columns and pd.notna(r.get("similarity")):
+                    st.caption(f"Tương đồng **{r['similarity']:.2f}**")
 
 
 
@@ -1161,6 +1171,46 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     border-color: var(--agoda-blue-dark) !important;
 }
 
+/* The thanh vien nhom o Tab 4 */
+.member-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.2rem 1rem;
+    text-align: center;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(7, 59, 76, 0.07);
+    height: 100%;
+}
+.member-avatar {
+    width: 68px;
+    height: 68px;
+    margin: 0 auto 0.7rem auto;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal), var(--turquoise));
+    color: #fff;
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 68px;
+    letter-spacing: 0.5px;
+}
+.member-name {
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: var(--deepsea);
+}
+.member-role {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+.member-mail {
+    font-size: 0.9rem;
+    color: var(--agoda-blue) !important;
+    text-decoration: none !important;
+    word-break: break-all;
+}
+.member-mail:hover { text-decoration: underline !important; }
+
 /* Khu ket qua goi y nhanh: tieu de chu de + anh minh hoa banner */
 .quick-hero-title {
     font-size: 1.55rem;
@@ -1308,8 +1358,8 @@ cf_art = load_cf_model()
 hotel_photos = load_hotel_photos()
 system_avg = compute_system_avg(df_hotel)
 
-tab1, tab2, tab3 = st.tabs(
-    [TAB1_LABEL, TAB2_LABEL, TAB3_LABEL],
+tab1, tab2, tab3, tab4 = st.tabs(
+    [TAB1_LABEL, TAB2_LABEL, TAB3_LABEL, TAB4_LABEL],
     key="active_tab_label",
     on_change="rerun",
 )
@@ -1388,7 +1438,8 @@ with tab2:
                 st.divider()
                 res_cf = st.session_state["tab2_results"]
                 st.subheader(f"Top {len(res_cf)} khách sạn tương tự")
-                render_results(res_cf, hotel_photos, state_key="tab2_viewing_id")
+                render_results(res_cf, hotel_photos, state_key="tab2_viewing_id",
+                               show_similarity=False)
 
 # ------------------------------------------------------------------ TAB 3
 with tab3:
@@ -1635,7 +1686,38 @@ with tab3:
             else:
                 st.info("Chưa đủ dữ liệu để rút ra insight.")
 
-# -------------------------------------------------------- LUON HIEN DUOI 3 TAB
+# ------------------------------------------------------------------ TAB 4
+with tab4:
+    st.markdown("### Nhóm 1 — Đồ án Hệ thống gợi ý khách sạn")
+    st.caption("Dữ liệu Agoda khu vực Nha Trang – Khánh Hoà · Content-based filtering + Item-based KNN")
+
+    st.markdown("#### Thành viên thực hiện")
+    cols_tv = st.columns(len(TEAM_MEMBERS))
+    for col, (name, email, role) in zip(cols_tv, TEAM_MEMBERS):
+        initials = "".join(w[0] for w in name.split()[-2:]).upper()
+        with col:
+            st.markdown(
+                f'<div class="member-card">'
+                f'<div class="member-avatar">{initials}</div>'
+                f'<div class="member-name">{name}</div>'
+                f'<div class="member-role">{role}</div>'
+                f'<a class="member-mail" href="mailto:{email}">✉️ {email}</a>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+    st.markdown("#### Nội dung đồ án")
+    st.markdown(
+        "- **Yêu cầu 1 — Gợi ý theo nội dung:** TF-IDF + Cosine Similarity trên mô tả "
+        "khách sạn, có tiền xử lý tiếng Việt (tách từ, bỏ stopword, chuẩn hoá teencode).\n"
+        "- **Yêu cầu 2 — Gợi ý theo lọc cộng tác:** Item-Based KNN (NearestNeighbors, "
+        "cosine) trên ma trận Khách sạn × Người dùng.\n"
+        "- **Yêu cầu 3 — Insight cho chủ khách sạn:** báo cáo tự động về điểm mạnh/yếu, "
+        "thống kê khách hàng, từ khoá nổi bật và so sánh với trung bình hệ thống."
+    )
+
+# -------------------------------------------------------- LUON HIEN DUOI CAC TAB
 # Dai goi y nhanh nam NGOAI cac tab — luon hien du dang o tab nao hay da tim kiem
 # hay chua, cho trang sinh dong hon thay vi bien mat sau khi bam tim.
 st.divider()
