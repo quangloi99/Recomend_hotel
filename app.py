@@ -375,6 +375,31 @@ def render_comparison_table(comparison: pd.DataFrame):
     st.markdown(html, unsafe_allow_html=True)
 
 
+@st.dialog("Chi tiết khách sạn", width="large")
+def render_hotel_detail_dialog(row: pd.Series, photos: dict):
+    """
+    Popup chi tiet khach san khi bam 'Xem chi tiet' tu danh sach goi y —
+    anh, dia chi, tong diem, so luot danh gia (giong demo Agoda da duyet).
+    """
+    thumb_html = hotel_thumb_html(row.get(C_ID), row.get(C_NAME, ""), photos)
+    st.markdown(
+        f'<div class="hotel-detail-thumb">{thumb_html}</div>',
+        unsafe_allow_html=True,
+    )
+    st.subheader(row.get(C_NAME, ""))
+    st.caption(f"{row.get(C_RANK, '')} · 📍 {row.get(C_ADDR, '')}")
+
+    c1, c2 = st.columns(2)
+    c1.metric("Tổng điểm", f"{fmt_score(row.get(C_SCORE))}/10")
+    count = row.get(C_COUNT, 0)
+    c2.metric("Số lượt đánh giá", f"{int(count) if pd.notna(count) else 0:,}".replace(",", "."))
+
+    desc = str(row.get(C_DESC, "") or "")
+    if desc:
+        st.divider()
+        st.write(desc)
+
+
 def render_results(df: pd.DataFrame, photos: dict = None):
     """Hien thi danh sach khach san goi y — the gon, anh dai dien, ten in dam."""
     photos = photos or {}
@@ -396,9 +421,13 @@ def render_results(df: pd.DataFrame, photos: dict = None):
                 if desc:
                     snippet = desc[:110] + ("…" if len(desc) > 110 else "")
                     st.caption(snippet)
+                if st.button("👁 Xem chi tiết", key=f"viewdetail_{r.get(C_ID)}"):
+                    render_hotel_detail_dialog(r, photos)
             with c_score:
                 st.metric("Điểm", fmt_score(r.get(C_SCORE)))
                 st.caption(f"Tương đồng **{r['similarity']:.2f}**")
+
+
 
 
 # =========================================================================
@@ -933,6 +962,14 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     display: block;
     border-radius: 12px;
 }
+.hotel-detail-thumb svg, .hotel-detail-thumb img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    display: block;
+    border-radius: 12px;
+    margin-bottom: 0.8rem;
+}
 .hotel-card-title {
     font-family: 'Fraunces', serif;
     font-weight: 700;
@@ -1000,8 +1037,12 @@ with tab1:
                 submitted = st.form_submit_button("🔍 Tìm kiếm", type="primary")
 
         if submitted:
-            st.divider()
             res = search_cosine(df_hotel, content_art, query or "", nums=top_n)
+            st.session_state["tab1_results"] = res
+
+        if "tab1_results" in st.session_state:
+            st.divider()
+            res = st.session_state["tab1_results"]
             st.subheader(f"Top {len(res)} khách sạn phù hợp nhất")
             render_results(res, hotel_photos)
 
@@ -1031,9 +1072,13 @@ with tab2:
                     cf_submitted = st.form_submit_button("👥 Tìm kiếm", type="primary")
 
             if cf_submitted:
-                st.divider()
                 picked_id = df_hotel.loc[df_hotel[C_NAME] == picked_name, C_ID].iloc[0]
                 res_cf = get_knn_similar_hotels(df_hotel, cf_art, picked_id, nums=cf_top_n)
+                st.session_state["tab2_results"] = res_cf
+
+            if "tab2_results" in st.session_state:
+                st.divider()
+                res_cf = st.session_state["tab2_results"]
                 st.subheader(f"Top {len(res_cf)} khách sạn tương tự (Item-Based KNN)")
                 render_results(res_cf, hotel_photos)
 
