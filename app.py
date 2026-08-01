@@ -689,6 +689,10 @@ def render_quick_suggestion_results(df_hotel: pd.DataFrame, art: dict, photos: d
     st.markdown(f'<div class="quick-hero-title">{label}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="quick-hero">{thumb_html}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="quick-hero-desc">{query_text}</div>', unsafe_allow_html=True)
+    kw = preprocess_text(query_text, art.get("text_res", {}))
+    if kw:
+        st.caption("🔎 Từ khoá hệ thống dùng để so khớp: "
+                   + ", ".join(w.replace("_", " ") for w in kw[:12]))
 
     # Chi tinh lai khi doi chu de — tranh chay search moi luot rerun
     if st.session_state.get("quick_results_idx") != idx:
@@ -790,11 +794,19 @@ def rank_by_score_with_fallback(df: pd.DataFrame, nums: int) -> pd.DataFrame:
     return pool.sort_values(C_SCORE, ascending=False, na_position="last").head(nums)
 
 
-def search_cosine(df_hotel: pd.DataFrame, art: dict, search_str: str, nums=5) -> pd.DataFrame:
+def search_cosine(df_hotel: pd.DataFrame, art: dict, search_str: str, nums=5,
+                  min_sim: float = 0.05, pool_mult: int = 6) -> pd.DataFrame:
     """
     Khop search_cosine trong notebook — TfidfVectorizer + cosine_similarity.
-    Trong tap khach san LIEN QUAN ve noi dung (similarity > 0), uu tien hien thi
-    khach san co Total_Score cao truoc (xem rank_by_score_with_fallback).
+
+    Quy trinh 2 buoc (quan trong):
+      B1. Loc theo NOI DUNG: chi giu khach san co similarity >= min_sim, roi lay
+          top (nums * pool_mult) khach san giong nhat lam tap ung vien.
+      B2. Trong tap ung vien do moi uu tien Total_Score cao (rank_by_score_with_fallback).
+
+    Neu bo B1 (nhu ban cu) thi mot khach san chi trung DUNG 1 tu vu vo (similarity 0.03)
+    van lot vao tap "lien quan", roi vi diem 10.0 nen nhay len dau bang — dung la
+    hien tuong "ket qua chang an nhap gi voi mo ta".
     """
     from sklearn.metrics.pairwise import cosine_similarity
 
@@ -805,12 +817,17 @@ def search_cosine(df_hotel: pd.DataFrame, art: dict, search_str: str, nums=5) ->
     search_vec = art["vectorizer"].transform([" ".join(words)])
     sim_cos = cosine_similarity(search_vec, art["tfidf_matrix"]).flatten()
 
-    relevant_idx = np.flatnonzero(sim_cos > 0)
+    relevant_idx = np.flatnonzero(sim_cos >= min_sim)
+    if len(relevant_idx) < nums:                      # noi long neu nguong qua chat
+        relevant_idx = np.flatnonzero(sim_cos > 0)
     if len(relevant_idx) == 0:
         return pd.DataFrame()
 
     pool = df_hotel.iloc[relevant_idx].copy()
     pool["similarity"] = sim_cos[relevant_idx]
+    # B1: giu lai nhung khach san GIONG NOI DUNG NHAT lam tap ung vien
+    pool = pool.sort_values("similarity", ascending=False).head(max(nums, nums * pool_mult))
+    # B2: trong tap ung vien do moi uu tien diem cao
     return rank_by_score_with_fallback(pool, nums)
 
 
