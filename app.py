@@ -1945,7 +1945,7 @@ with tab3:
 # ------------------------------------------------------------------ TAB 4
 with tab4:
     st.markdown("### Nhóm 1 — Đồ án Hệ thống gợi ý khách sạn")
-    st.caption("Dữ liệu Agoda khu vực Nha Trang – Khánh Hoà · Content-based filtering + Item-based KNN")
+    st.caption("Dữ liệu Agoda khu vực Nha Trang – Khánh Hoà · Content-based filtering + User-based CF")
 
     st.markdown("#### Thành viên thực hiện")
     cols_tv = st.columns(len(TEAM_MEMBERS))
@@ -1963,12 +1963,76 @@ with tab4:
             )
 
     st.divider()
+    st.markdown("#### Dữ liệu sử dụng")
+    st.caption(
+        "Hai tệp thu thập từ Agoda cho khu vực Nha Trang – Khánh Hoà, nối với nhau "
+        "qua khoá `Hotel_ID`."
+    )
+
+    # Cac con so duoc TINH TRUC TIEP tu du lieu dang chay, khong ghi cung —
+    # doi file du lieu la bang so tu cap nhat theo, khong so lech voi bao cao.
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Khách sạn", f"{len(df_hotel):,}")
+    d2.metric("Lượt đánh giá", f"{len(df_cmt):,}")
+    if not df_cmt.empty and CM_NATION in df_cmt.columns:
+        d3.metric("Quốc tịch khách", f"{df_cmt[CM_NATION].nunique():,}")
+    if not df_cmt.empty and CM_SCORE in df_cmt.columns:
+        d4.metric("Điểm đánh giá TB", fmt_score(df_cmt[CM_SCORE].mean()))
+
+    c_left, c_right = st.columns(2)
+    with c_left:
+        st.markdown("**`hotel_info.csv` — hồ sơ khách sạn**")
+        st.markdown(
+            "- Định danh & mô tả: `Hotel_ID`, `Hotel_Name`, `Hotel_Rank` (hạng sao), "
+            "`Hotel_Address`, `Hotel_Description`\n"
+            "- 6 điểm thành phần: `Location`, `Cleanliness`, `Service`, `Facilities`, "
+            "`Value_for_money`, `Comfort_and_room_quality`\n"
+            "- `Total_Score` (điểm tổng /10) và `comments_count`\n"
+            "- `Hotel_Description` là **nguyên liệu chính của Yêu cầu 1** — TF-IDF chạy trên cột này"
+        )
+    with c_right:
+        st.markdown("**`hotel_comments.csv` — đánh giá của khách**")
+        st.markdown(
+            "- Người đánh giá: `Reviewer_Name`, `Nationality`, `Group_Name` "
+            "(hình thức đi du lịch)\n"
+            "- Nội dung: `Title`, `Body`, `Score`, `Score_Level`, `Room_Type`, `Stay_Details`\n"
+            "- Thời gian: `Review_Date` → tách thành `Review_Year`, `Review_YearMonth`\n"
+            "- Bộ 3 `Reviewer_Name + Nationality + Group_Name` là **khoá gom người dùng "
+            "của Yêu cầu 2**"
+        )
+
+    if not df_cmt.empty and CM_GROUP in df_cmt.columns:
+        with st.expander("Phân bố khách theo hình thức đi du lịch & quốc tịch"):
+            g1, g2 = st.columns(2)
+            with g1:
+                st.markdown("**Hình thức đi du lịch**")
+                st.dataframe(
+                    df_cmt[CM_GROUP].value_counts().rename("Số lượt đánh giá"),
+                    use_container_width=True,
+                )
+            with g2:
+                st.markdown("**Top 8 quốc tịch**")
+                st.dataframe(
+                    df_cmt[CM_NATION].value_counts().head(8).rename("Số lượt đánh giá"),
+                    use_container_width=True,
+                )
+
+    st.markdown(
+        "**Lưu ý về dữ liệu (đã xử lý trong đồ án):** cột `Reviewer_ID` gốc là duy nhất "
+        "cho *từng dòng* đánh giá nên không dùng làm người dùng được — nhóm đã gom lại theo "
+        "3 đặc điểm ở trên. Điểm số lưu dạng dấu phẩy thập phân kiểu Việt Nam, `Hotel_Rank` "
+        "ở dạng chuỗi *“4 sao trên 5”*, và một khách sạn có thể xuất hiện dưới nhiều "
+        "`Hotel_ID` — tất cả đều được chuẩn hoá ở bước tiền xử lý."
+    )
+
+    st.divider()
     st.markdown("#### Nội dung đồ án")
     st.markdown(
         "- **Yêu cầu 1 — Gợi ý theo nội dung:** TF-IDF + Cosine Similarity trên mô tả "
         "khách sạn, có tiền xử lý tiếng Việt (tách từ, bỏ stopword, chuẩn hoá teencode).\n"
-        "- **Yêu cầu 2 — Gợi ý theo lọc cộng tác:** Item-Based KNN (NearestNeighbors, "
-        "cosine) trên ma trận Khách sạn × Người dùng.\n"
+        "- **Yêu cầu 2 — Gợi ý theo lọc cộng tác:** gom khách hàng bằng "
+        "`Reviewer_Name + Nationality + Group_Name` → ma trận Người dùng × Khách sạn → "
+        "tìm người dùng tương tự bằng NearestNeighbors (cosine) rồi bỏ phiếu có trọng số.\n"
         "- **Yêu cầu 3 — Insight cho chủ khách sạn:** báo cáo tự động về điểm mạnh/yếu, "
         "thống kê khách hàng, từ khoá nổi bật và so sánh với trung bình hệ thống."
     )
