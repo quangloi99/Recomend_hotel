@@ -107,7 +107,8 @@ QUICK_TOP_N = 5           # bam o goi y nhanh -> tra ve top 5 khach san
 TAB1_LABEL = "🔍 1. Gợi ý theo nội dung"
 TAB2_LABEL = "👥 2. Gợi ý theo lọc cộng tác"
 TAB3_LABEL = "📊 3. Insight cho chủ khách sạn"
-TAB4_LABEL = "👋 4. Về nhóm thực hiện"
+TAB4_LABEL = "📁 4. Dữ liệu & yêu cầu bài toán"
+TAB5_LABEL = "👋 5. Về nhóm thực hiện"
 
 # Thanh vien nhom — (ho ten, email, vai tro)
 TEAM_MEMBERS = [
@@ -1541,8 +1542,8 @@ cf_art = load_cf_model()
 hotel_photos = load_hotel_photos()
 system_avg = compute_system_avg(df_hotel)
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    [TAB1_LABEL, TAB2_LABEL, TAB3_LABEL, TAB4_LABEL],
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    [TAB1_LABEL, TAB2_LABEL, TAB3_LABEL, TAB4_LABEL, TAB5_LABEL],
     key="active_tab_label",
     on_change="rerun",
 )
@@ -1944,25 +1945,11 @@ with tab3:
 
 # ------------------------------------------------------------------ TAB 4
 with tab4:
-    st.markdown("### Nhóm 1 — Đồ án Hệ thống gợi ý khách sạn")
-    st.caption("Dữ liệu Agoda khu vực Nha Trang – Khánh Hoà · Content-based filtering + User-based CF")
+    st.markdown("### Dữ liệu & yêu cầu bài toán")
+    st.caption(
+        "Đồ án Hệ thống gợi ý khách sạn — dữ liệu Agoda khu vực Nha Trang – Khánh Hoà."
+    )
 
-    st.markdown("#### Thành viên thực hiện")
-    cols_tv = st.columns(len(TEAM_MEMBERS))
-    for col, (name, email, role) in zip(cols_tv, TEAM_MEMBERS):
-        initials = "".join(w[0] for w in name.split()[-2:]).upper()
-        with col:
-            st.markdown(
-                f'<div class="member-card">'
-                f'<div class="member-avatar">{initials}</div>'
-                f'<div class="member-name">{name}</div>'
-                f'<div class="member-role">{role}</div>'
-                f'<a class="member-mail" href="mailto:{email}">✉️ {email}</a>'
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-    st.divider()
     st.markdown("#### Dữ liệu sử dụng")
     st.caption(
         "Hai tệp thu thập từ Agoda cho khu vực Nha Trang – Khánh Hoà, nối với nhau "
@@ -2026,7 +2013,7 @@ with tab4:
     )
 
     st.divider()
-    st.markdown("#### Nội dung đồ án")
+    st.markdown("#### Yêu cầu bài toán")
     st.markdown(
         "- **Yêu cầu 1 — Gợi ý theo nội dung:** TF-IDF + Cosine Similarity trên mô tả "
         "khách sạn, có tiền xử lý tiếng Việt (tách từ, bỏ stopword, chuẩn hoá teencode).\n"
@@ -2036,6 +2023,26 @@ with tab4:
         "- **Yêu cầu 3 — Insight cho chủ khách sạn:** báo cáo tự động về điểm mạnh/yếu, "
         "thống kê khách hàng, từ khoá nổi bật và so sánh với trung bình hệ thống."
     )
+
+# ------------------------------------------------------------------ TAB 5
+with tab5:
+    st.markdown("### Nhóm 1 — Đồ án Hệ thống gợi ý khách sạn")
+    st.caption("Dữ liệu Agoda khu vực Nha Trang – Khánh Hoà · Content-based filtering + User-based CF")
+
+    st.markdown("#### Thành viên thực hiện")
+    cols_tv = st.columns(len(TEAM_MEMBERS))
+    for col, (name, email, role) in zip(cols_tv, TEAM_MEMBERS):
+        initials = "".join(w[0] for w in name.split()[-2:]).upper()
+        with col:
+            st.markdown(
+                f'<div class="member-card">'
+                f'<div class="member-avatar">{initials}</div>'
+                f'<div class="member-name">{name}</div>'
+                f'<div class="member-role">{role}</div>'
+                f'<a class="member-mail" href="mailto:{email}">✉️ {email}</a>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
 # -------------------------------------------------------- LUON HIEN DUOI CAC TAB
 # Dai goi y nhanh nam NGOAI cac tab — luon hien du dang o tab nao hay da tim kiem
