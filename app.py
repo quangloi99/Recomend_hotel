@@ -1518,7 +1518,7 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
     <span class="hero-eyebrow">Nha Trang · Khánh Hoà</span>
     <h1 class="hero-title">Hệ thống gợi ý tìm kiếm khách sạn ở Nha Trang</h1>
     <p class="hero-sub">
-        Đồ án tốt nghiệp Data Science · Nhóm thực hiện: Kim Thanh – Quang Lợi
+        Đồ án tốt nghiệp Data Science
     </p>
 </div>
 """.replace("__HERO_BG__", _hero_bg_css)
